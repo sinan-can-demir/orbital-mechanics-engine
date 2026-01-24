@@ -99,10 +99,10 @@ Your project already has excellent foundation:
 4. **Professional Grade**: CI/CD, documentation, testing
 
 ### Target Audiences
-1. **Researchers**: Need high-accuracy, validated tools
-2. **Students**: Learning orbital mechanics with real data
-3. **Professionals**: Quick analysis tool for preliminary design
-4. **Educators**: Demonstrating physics concepts visually
+1. **Researchers**: Need high-accuracy, validated tools + Python API for analysis
+2. **Students**: Learning orbital mechanics with real data + Jupyter notebooks
+3. **Professionals**: Quick analysis tool for preliminary design + rapid prototyping
+4. **Educators**: Demonstrating physics concepts visually + interactive notebooks
 
 ---
 
