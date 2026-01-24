@@ -1,0 +1,53 @@
+name: C++ CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up CMake
+      uses: lukka/get-cmake@latest
+
+    # -------------------------------
+    # Configure Debug
+    # -------------------------------
+    - name: Configure (Debug)
+      run: |
+        cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug
+
+    # -------------------------------
+    # Build core + CLI only (skip viewer)
+    # -------------------------------
+    - name: Build (Debug)
+      run: |
+        cmake --build build-debug --target orbit_core orbit-sim --parallel
+
+    # -------------------------------
+    # Run a smoke test
+    # -------------------------------
+    - name: Run basic simulation
+      run: |
+        ./build-debug/bin/orbit-sim --help
+
+    # -------------------------------
+    # Configure Release
+    # -------------------------------
+    - name: Configure (Release)
+      run: |
+        cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+
+    # -------------------------------
+    # Build core + CLI only (Release)
+    # -------------------------------
+    - name: Build (Release)
+      run: |
+        cmake --build build-release --target orbit_core orbit-sim --parallel
