@@ -26,4 +26,6 @@
 !plotting_scripts/**/
 !docs
 !docs/**
+!.github/
+!.github/**
 !CMakeLists.txt
