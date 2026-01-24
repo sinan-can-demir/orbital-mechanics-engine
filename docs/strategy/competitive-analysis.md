@@ -40,18 +40,20 @@
 
 ## 🎯 Your Unique Position
 
-**"High-Performance, NASA-Validated C++ Alternative to Python Orbital Tools"**
+**"Research-Grade C++ Engine with Python Accessibility - Following REBOUND/Tudat Model"**
 
 ### Key Differentiators
-1. **NASA HORIZONS Integration**: Real ephemeris validation
-2. **C++ Performance**: 10x faster than Python alternatives
-3. **Complete Stack**: Simulation + visualization + analysis
-4. **Professional Quality**: CI/CD, documentation, testing
+1. **Symplectic Integration**: Research-grade numerical methods (Leapfrog, RK45)
+2. **Python API**: Research community access without performance compromise
+3. **NASA HORIZONS Integration**: Real ephemeris validation
+4. **C++ Performance**: 10x faster than Python alternatives
+5. **Complete Stack**: Simulation + visualization + analysis
+6. **Professional Quality**: CI/CD, documentation, testing
 
 ### Target Market Gaps
-- **Researchers needing performance**: Faster than Python, more accessible than commercial
-- **Educators wanting accuracy**: Real NASA data vs simplified models
-- **Professionals needing prototyping**: Faster development than commercial tools
+- **Researchers needing performance**: Faster than Python, more accessible than commercial + Python API for rapid analysis
+- **Educators wanting accuracy**: Real NASA data vs simplified models + Jupyter notebooks for teaching
+- **Professionals needing prototyping**: Faster development than commercial tools + Python workflow for rapid iteration
 
 ## 📈 Growth Opportunities
 
