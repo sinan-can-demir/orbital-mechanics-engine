@@ -1,4 +1,3 @@
-
 # 🌍 Orbital Dynamics Simulation Engine
 
 *A high-accuracy C++17 N‑Body gravitational simulator with RK4 integration, OpenGL visualization, JPL HORIZONS ephemeris support, and eclipse detection.*
@@ -72,9 +71,9 @@ This system is engineered to be **modular, accurate, and extensible** — suitab
 ## 📁 Project Structure
 
 ```
-orbits-of-earth-and-moon/
+earth-and-moon-orbits/
 │
-├── include/
+├── include/                 # Header files
 │   ├── body.h
 │   ├── simulation.h
 │   ├── json_loader.h
@@ -86,18 +85,18 @@ orbits-of-earth-and-moon/
 │       └── sphere_mesh.h
 │
 ├── src/
-│   ├── core/            # Physics engine
-│   ├── io/              # JSON + HORIZONS
-│   ├── cli/             # Command-line interface
-│   ├── viewer/          # OpenGL renderer
+│   ├── core/               # Physics engine
+│   ├── io/                 # JSON + HORIZONS
+│   ├── cli/                # Command-line interface
+│   ├── viewer/             # OpenGL renderer
 │   └── …
 │
-├── external/glad        # glad library
-├── systems/             # JSON orbital systems
-├── shaders/             # GLSL shaders
-├── results/             # CSV output + plots
-├── plotting_scripts/    # Python analysis tools
-├── cli_reference.md     # commands for orbit-sim
+├── external/glad          # glad library
+├── systems/               # JSON orbital systems
+├── shaders/               # GLSL shaders
+├── docs/                  # Technical documentation
+├── plotting_scripts/      # Python analysis tools
+├── orbit_sim_cli_reference.md  # CLI commands
 └── README.md
 ```
 
@@ -107,17 +106,19 @@ orbits-of-earth-and-moon/
 
 ### Requirements
 - C++17 compiler
-- CMake ≥ 3.10
+- CMake ≥ 3.14
 - OpenGL 3.3
 - GLAD
 - GLFW3
+- GLM (OpenGL Mathematics)
+- libcurl
 - Python 3 (optional, for plotting)
 
 ### Build Steps
 
 ```bash
-git clone https://github.com/eisensenpou/orbits-of-earth-and-moon.git
-cd orbits-of-earth-and-moon
+git clone https://github.com/eisensenpou/earth-and-moon-orbits.git
+cd earth-and-moon-orbits
 mkdir build && cd build
 cmake ..
 make -j
@@ -201,7 +202,7 @@ Includes:
 
 ---
 
-## 📐 Physics Notes
+## 📐 Physical Model Summary
 
 ### Newtonian gravity
 $$
@@ -226,32 +227,68 @@ $$
 
 ---
 
-## 🧪 Validation With NASA HORIZONS
+## 📐 Numerical Methods Summary
 
-Direct comparison with:
-- DE441 ephemerides  
-- Barycentric or heliocentric frames  
-- Geometric or light‑time‑corrected vectors  
+The simulation employs a fourth-order Runge-Kutta (RK4) integrator for state propagation:
 
-Useful for:
-- Evaluating integrator stability  
-- Verifying orbital parameters  
-- Monitoring Moon–Earth distance accuracy  
+- **State vector**: $\mathbf{y} = [\mathbf{r}, \mathbf{v}]^T$ for each body
+- **Time step**: User-configurable, typically 60-3600 seconds
+- **Accuracy**: $O(\Delta t^4)$ local truncation error
+- **Stability**: Suitable for orbital timescales with appropriate step sizing
+- **Conservation monitoring**: Energy, linear momentum, angular momentum tracked at each step
 
 ---
 
-## 🛤 Roadmap
+## 🧪 Validation Summary
 
-Future upgrades:
+### Conservation Law Monitoring
+- Total energy drift: $|E(t) - E(0)|/E(0)$
+- Linear momentum conservation: $|\mathbf{P}(t) - \mathbf{P}(0)|$
+- Angular momentum conservation: $|\mathbf{L}(t) - \mathbf{L}(0)|$
 
-- Adaptive RK45 integrator  
-- Barnes–Hut tree acceleration  
-- GPU kernels (CUDA/OpenCL)  
-- In‑viewer time controls  
-- Planetary textures  
-- Orbital trails  
-- GUI (ImGui) overlay  
-- Ephemeris interpolation  
+### Ephemeris Comparison
+- Direct comparison with NASA JPL HORIZONS data
+- Position and velocity residuals
+- Long-term orbital element drift analysis
+
+### Barycenter Stability
+- System barycenter tracking
+- Numerical drift assessment
+- Reference frame consistency
+
+---
+
+## 🛤 Limitations
+
+### Numerical
+- Fixed time step integration (no adaptive stepping)
+- Long-term energy drift in multi-body systems
+- Round-off error accumulation in extended simulations
+
+### Physical Model
+- Newtonian gravity only (no relativistic corrections)
+- Point mass approximation (no oblateness or tidal effects)
+- No perturbations from non-gravitational forces
+
+### System Constraints
+- Limited to modest N-body counts (performance considerations)
+- No collision detection or handling
+- Simplified eclipse geometry (no atmospheric effects)
+
+---
+
+## 🚀 Future Work
+
+- Adaptive RK45 integrator implementation
+- Barnes-Hut tree acceleration for large N
+- GPU acceleration (CUDA/OpenCL)
+- Relativistic corrections for high-precision applications
+- Planetary oblateness and tidal effects
+- Collision detection and handling
+- In-viewer time controls and playback
+- Planetary textures and enhanced rendering
+- GUI overlay (ImGui integration)
+- Ephemeris interpolation utilities
 
 ---
 
@@ -269,3 +306,4 @@ Aspiring Aerospace / Simulation Engineer
 GitHub: https://github.com/eisensenpou  
 LinkedIn: https://linkedin.com/in/sinan-can-demir  
 
+---
