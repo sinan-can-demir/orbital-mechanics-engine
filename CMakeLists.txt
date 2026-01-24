@@ -7,6 +7,9 @@ project(EarthAndMoonOrbits VERSION 1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Option to enable / disable viewer (ON locally, OFF in CI)
+option(BUILD_VIEWER "Build OpenGL viewer" ON)
+
 # Put all executables in build/bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -14,15 +17,19 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # ------------------------------------------------------------
-# External Dependencies
+# External Dependencies (core always needed)
 # ------------------------------------------------------------
-find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)       # for matrices & vectors
 find_package(CURL REQUIRED)
 
+# Viewer-only dependencies (only searched if viewer enabled)
+if (BUILD_VIEWER)
+    find_package(OpenGL REQUIRED)
+    find_package(glfw3 REQUIRED)
+    find_package(glm REQUIRED)       # for matrices & vectors
+endif()
+
 # ------------------------------------------------------------
-# GLAD
+# GLAD (only needed for viewer, but harmless to always build)
 # ------------------------------------------------------------
 add_library(glad STATIC
     ${PROJECT_SOURCE_DIR}/external/glad/src/glad.c
@@ -50,8 +57,10 @@ target_include_directories(orbit_core PUBLIC
 target_compile_features(orbit_core PUBLIC cxx_std_17)
 
 # ------------------------------------------------------------
-# orbit-viewer (OpenGL renderer)
+# orbit-viewer (OpenGL renderer) — OPTIONAL
 # ------------------------------------------------------------
+if (BUILD_VIEWER)
+
 add_executable(orbit-viewer
     src/viewer/orbit_viewer.cpp
     src/viewer/csv_loader.cpp
@@ -82,6 +91,8 @@ else()
         glm::glm
     )
 endif()
+
+endif()  # BUILD_VIEWER
 
 # ------------------------------------------------------------
 # orbit-sim (CLI executable)
