@@ -1,4 +1,4 @@
-# Contributing to Earth and Moon Orbits
+# Contributing to Orbital Mechanics Engine
 
 Thank you for your interest in contributing!
 This project is a high-accuracy C++17 N-body gravitational simulator with RK4 integration, OpenGL visualization, JPL HORIZONS ephemeris support, and eclipse detection.
@@ -10,9 +10,9 @@ Contributions of all kinds are welcome — code, documentation, bug reports, ide
 
 Click "Fork" in the top-right corner of the GitHub page and clone your fork:
 ```bash
-git clone https://github.com/YOUR_USERNAME/earth-and-moon-orbits.git
-cd earth-and-moon-orbits
-git remote add upstream https://github.com/eisensenpou/earth-and-moon-orbits.git
+git clone https://github.com/YOUR_USERNAME/orbital-mechanics-engine.git
+cd orbital-mechanics-engine
+git remote add upstream https://github.com/eisensenpou/orbital-mechanics-engine.git
 ```
 
 ### 2. Create a Branch
@@ -86,8 +86,8 @@ vcpkg install curl glfw3 glm opengl
 
 ```bash
 # Clone and navigate to project
-git clone https://github.com/eisensenpou/earth-and-moon-orbits.git
-cd earth-and-moon-orbits
+git clone https://github.com/eisensenpou/orbital-mechanics-engine.git
+cd orbital-mechanics-engine
 
 # Build Debug configuration (CI-compatible)
 mkdir build-debug && cd build-debug

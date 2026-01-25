@@ -1,6 +1,6 @@
-# Comprehensive Development Roadmap: Earth and Moon Orbits
+# Comprehensive Development Roadmap: Orbital Mechanics Engine
 
-**Project**: Earth and Moon Orbits - High-Accuracy C++ Orbital Dynamics Simulator  
+**Project**: Orbital Mechanics Engine - High-Accuracy C++ Orbital Dynamics Simulator  
 **Strategic Goal**: Bridge gap between Python educational tools and commercial software through numerical credibility + Python accessibility
 
 ---
@@ -347,6 +347,6 @@ Following successful model of:
 2. **Publication venues**: Determine journals/conferences for numerical methods
 3. **Community engagement**: Prepare academic outreach materials
 
-This roadmap positions Earth and Moon Orbits to become the standard open-source computational astrodynamics platform, combining research-grade numerical credibility with Python ecosystem accessibility.
+This roadmap positions Orbital Mechanics Engine to become the standard open-source computational astrodynamics platform, combining research-grade numerical credibility with Python ecosystem accessibility.
 
 **Success Vision**: 1000+ GitHub stars, academic citations, and adoption as standard tool for orbital mechanics research and education.

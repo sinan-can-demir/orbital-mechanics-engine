@@ -1,4 +1,4 @@
-# 🌍 Orbital Dynamics Simulation Engine
+# 🌍 Orbital Mechanics Engine
 
 *A high-accuracy C++17 N‑Body gravitational simulator with RK4 integration, OpenGL visualization, JPL HORIZONS ephemeris support, and eclipse detection.*
 
@@ -71,7 +71,7 @@ This system is engineered to be **modular, accurate, and extensible** — suitab
 ## 📁 Project Structure
 
 ```
-earth-and-moon-orbits/
+orbital-mechanics-engine/
 │
 ├── include/                 # Header files
 │   ├── body.h
@@ -96,7 +96,7 @@ earth-and-moon-orbits/
 ├── shaders/               # GLSL shaders
 ├── docs/                  # Technical documentation
 ├── plotting_scripts/      # Python analysis tools
-├── orbit_sim_cli_reference.md  # CLI commands
+├── orbital_mechanics_engine_cli_reference.md  # CLI commands
 └── README.md
 ```
 
@@ -117,8 +117,8 @@ earth-and-moon-orbits/
 ### Build Steps
 
 ```bash
-git clone https://github.com/eisensenpou/earth-and-moon-orbits.git
-cd earth-and-moon-orbits
+git clone https://github.com/eisensenpou/orbital-mechanics-engine.git
+cd orbital-mechanics-engine
 mkdir build && cd build
 cmake ..
 make -j

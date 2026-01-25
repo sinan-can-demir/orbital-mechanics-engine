@@ -8,11 +8,11 @@ Your README is already comprehensive (309 lines) with excellent technical detail
 
 ### 1. Add Badges Section (top of README)
 ```markdown
-![GitHub stars](https://img.shields.io/github/stars/eisensenpou/earth-and-moon-orbits)
-![GitHub forks](https://img.shields.io/github/forks/eisensenpou/earth-and-moon-orbits)
-![GitHub issues](https://img.shields.io/github/issues/eisensenpou/earth-and-moon-orbits)
-![GitHub license](https://img.shields.io/github/license/eisensenpou/earth-and-moon-orbits)
-![Build Status](https://github.com/eisensenpou/earth-and-moon-orbits/workflows/C%2B%2B%20CI/badge.svg)
+![GitHub stars](https://img.shields.io/github/stars/eisensenpou/orbital-mechanics-engine)
+![GitHub forks](https://img.shields.io/github/forks/eisensenpou/orbital-mechanics-engine)
+![GitHub issues](https://img.shields.io/github/issues/eisensenpou/orbital-mechanics-engine)
+![GitHub license](https://img.shields.io/github/license/eisensenpou/orbital-mechanics-engine)
+![Build Status](https://github.com/eisensenpou/orbital-mechanics-engine/workflows/C%2B%2B%20CI/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-blue)
 ```
@@ -21,7 +21,7 @@ Your README is already comprehensive (309 lines) with excellent technical detail
 ```markdown
 ## 🌟 What Makes This Different?
 
-Unlike other open-source orbital tools, **Earth and Moon Orbits** provides:
+Unlike other open-source orbital tools, **Orbital Mechanics Engine** provides:
 
 ✅ **NASA-Validated Accuracy**: Real JPL HORIZONS ephemeris comparison, not just textbook examples  
 ✅ **C++ Performance**: 10x faster than Python alternatives like poliastro  
@@ -42,8 +42,8 @@ Unlike other open-source orbital tools, **Earth and Moon Orbits** provides:
 
 ```bash
 # Clone and build
-git clone https://github.com/eisensenpou/earth-and-moon-orbits.git
-cd earth-and-moon-orbits
+git clone https://github.com/eisensenpou/orbital-mechanics-engine.git
+cd orbital-mechanics-engine
 mkdir build && cd build
 cmake .. && make
 
@@ -77,14 +77,14 @@ cmake .. && make
 ```markdown
 ## 👥 Community & Support
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/eisensenpou/earth-and-moon-orbits/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/eisensenpou/earth-and-moon-orbits/discussions)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/eisensenpou/orbital-mechanics-engine/issues)
+- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/eisensenpou/orbital-mechanics-engine/discussions)
 - 📖 **Documentation**: [Full Documentation](docs/)
 - 🎓 **Tutorial Videos**: [Coming Soon](https://youtube.com/your-channel)
 
 ### Recent Community Activity
-- 🌟 [50+ GitHub stars](https://github.com/eisensenpou/earth-and-moon-orbits/stargazers)
-- 🔄 [Active development](https://github.com/eisensenpou/earth-and-moon-orbits/commits/main)
+- 🌟 [50+ GitHub stars](https://github.com/eisensenpou/orbital-mechanics-engine/stargazers)
+- 🔄 [Active development](https://github.com/eisensenpou/orbital-mechanics-engine/commits/main)
 - 📚 [Academic citations](https://scholar.google.com/...) (coming soon)
 
 ---
@@ -93,7 +93,7 @@ cmake .. && make
 
 If this project helps your research or education, please ⭐ star it on GitHub!
 
-[![GitHub stars](https://img.shields.io/github/stars/eisensenpou/earth-and-moon-orbits?style=social)](https://github.com/eisensenpou/earth-and-moon-orbits)
+[![GitHub stars](https://img.shields.io/github/stars/eisensenpou/orbital-mechanics-engine?style=social)](https://github.com/eisensenpou/orbital-mechanics-engine)
 ```
 
 ### 6. Add Installation Badges by Platform
@@ -101,14 +101,14 @@ If this project helps your research or education, please ⭐ star it on GitHub!
 ## 📦 Installation
 
 ### Package Managers (Coming Soon)
-- [![Conan](https://img.shields.io/badge/Conan-Ready-blue)](https://conan.io/center/earth-and-moon-orbits)
+- [![Conan](https://img.shields.io/badge/Conan-Ready-blue)](https://conan.io/center/orbital-mechanics-engine)
 - [![vcpkg](https://img.shields.io/badge/vcpkg-Ready-blue)](https://github.com/Microsoft/vcpkg)
 - [![Homebrew](https://img.shields.io/badge/Homebrew-Ready-blue)](https://brew.sh/)
 
 ### Docker
 ```bash
-docker pull ghcr.io/eisensenpou/earth-and-moon-orbits:latest
-docker run -it ghcr.io/eisensenpou/earth-and-moon-orbits
+docker pull ghcr.io/eisensenpou/orbital-mechanics-engine:latest
+docker run -it ghcr.io/eisensenpou/orbital-mechanics-engine
 ```
 ```
 
@@ -121,11 +121,11 @@ If you use this in research, please cite:
 ```bibtex
 @software{earth_moon_orbits_2025,
   author = {Demir, Sinan Can},
-  title = {Earth and Moon Orbits: High-Accuracy C++ Orbital Dynamics Simulator},
+  title = {Orbital Mechanics Engine: High-Accuracy C++ Orbital Dynamics Simulator},
   year = {2025},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/eisensenpou/earth-and-moon-orbits}}
+  howpublished = {\url{https://github.com/eisensenpou/orbital-mechanics-engine}}
 }
 ```
 ```

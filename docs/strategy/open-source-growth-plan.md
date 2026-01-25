@@ -1,6 +1,6 @@
 # Strategic Plan for Open Source Popularity
 
-**Project**: Earth and Moon Orbits - High-Accuracy C++ Orbital Dynamics Simulator  
+**Project**: Orbital Mechanics Engine - High-Accuracy C++ Orbital Dynamics Simulator  
 **Author**: Generated Analysis  
 **Date**: January 2026  
 **Target**: Open Source Community Growth
@@ -301,4 +301,4 @@ Your project already has excellent foundation:
 
 ---
 
-*This strategy document serves as a living guide for growing the Earth and Moon Orbits project's open-source community presence and impact.*
+*This strategy document serves as a living guide for growing the Orbital Mechanics Engine project's open-source community presence and impact.*
