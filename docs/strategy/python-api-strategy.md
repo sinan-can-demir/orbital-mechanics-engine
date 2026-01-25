@@ -166,8 +166,8 @@ del sim  # Python cleanup triggers C++ cleanup
 
 ```bash
 # Development install
-git clone https://github.com/eisensenpou/earth-and-moon-orbits
-cd earth-and-moon-orbits
+git clone https://github.com/eisensenpou/orbital-mechanics-engine
+cd orbital-mechanics-engine
 pip install -e .
 
 # PyPI install (after release)
@@ -306,9 +306,9 @@ dev = ["pytest>=7.0", "pandas>=1.3", "sphinx>=5.0"]
 jupyter = ["jupyter>=1.0", "ipywidgets>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/eisensenpou/earth-and-moon-orbits"
-Documentation = "https://earth-moon-orbits.readthedocs.io"
-Repository = "https://github.com/eisensenpou/earth-and-moon-orbits"
+Homepage = "https://github.com/eisensenpou/orbital-mechanics-engine"
+Documentation = "https://orbital-mechanics-engine.readthedocs.io"
+Repository = "https://github.com/eisensenpou/orbital-mechanics-engine"
 ```
 
 ### **Release Process**
@@ -326,9 +326,9 @@ import earth_moon_orbits as emo
 
 # Reference in papers
 """
-Simulations performed using Earth and Moon Orbits v1.3.0 (Demir, 2025).
+Simulations performed using Orbital Mechanics Engine v1.3.0 (Demir, 2025).
 High-accuracy symplectic integration with NASA HORIZONS validation.
-GitHub: https://github.com/eisensenpou/earth-and-moon-orbits
+GitHub: https://github.com/eisensenpou/orbital-mechanics-engine
 """
 ```
 

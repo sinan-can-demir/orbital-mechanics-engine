@@ -17,7 +17,7 @@ Key Features:
 - OpenGL 3D visualization
 - MIT License - completely free for academic use
 
-The project is available at: https://github.com/eisensenpou/earth-and-moon-orbits
+The project is available at: https://github.com/eisensenpou/orbital-mechanics-engine
 
 I would be grateful for your feedback on whether this tool could support your research, and I'm open to collaboration on extending it for specific applications.
 
@@ -43,7 +43,7 @@ What makes this different:
 - Professional development practices (CI/CD, documentation)
 - MIT License for commercial use
 
-Project: https://github.com/eisensenpou/earth-and-moon-orbits
+Project: https://github.com/eisensenpou/orbital-mechanics-engine
 
 Many teams use this for:
 - Mission concept analysis
@@ -69,7 +69,7 @@ Sinan Demir
 
 #OpenSource #CPlusPlus #OrbitalMechanics #SpaceTech #NASA
 
-GitHub: https://github.com/eisensenpou/earth-and-moon-orbits
+GitHub: https://github.com/eisensenpou/orbital-mechanics-engine
 ```
 
 ### LinkedIn
@@ -93,7 +93,7 @@ This addresses the performance gap between Python tools and commercial software,
 
 #OpenSource #SoftwareEngineering #Space #Aerospace #ScientificComputing #CPlusPlus
 
-Project: https://github.com/eisensenpou/earth-and-moon-orbits
+Project: https://github.com/eisensenpou/orbital-mechanics-engine
 ```
 
 ### Reddit - Programming
@@ -118,7 +118,7 @@ What makes it different from poliastro/other tools:
 3. Completeness: Simulation + visualization + analysis tools
 4. Professional grade: CI/CD, proper testing, documentation
 
-GitHub: https://github.com/eisensenpou/earth-and-moon-orbits
+GitHub: https://github.com/eisensenpou/orbital-mechanics-engine
 
 Happy to hear feedback from the community, especially from those working in aerospace or scientific computing!
 ```
@@ -145,7 +145,7 @@ What's unique: Unlike other open-source tools, this validates against real NASA 
 
 Tech stack: C++17, CMake, OpenGL, GLFW, GLM, NASA JPL HORIZONS API
 
-GitHub: https://github.com/eisensenpou/earth-and-moon-orbits
+GitHub: https://github.com/eisensenpou/orbital-mechanics-engine
 
 Happy to answer questions about the implementation, validation methodology, or orbital mechanics in general!
 ```
@@ -192,7 +192,7 @@ What would make this tool most useful for your work?
 - Better integration with existing workflows?
 - Language bindings (Python, Julia, MATLAB)?
 
-Project: https://github.com/eisensenpou/earth-and-moon-orbits
+Project: https://github.com/eisensenpou/orbital-mechanics-engine
 
 All feedback welcome - this is meant to serve the community's needs!
 
