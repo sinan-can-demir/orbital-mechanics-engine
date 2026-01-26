@@ -5,32 +5,31 @@
  * @date 11/25/2025
  **********************/
 
-
 #ifndef CSV_LOADER_H
 #define CSV_LOADER_H
 
+#include <fstream>
+#include <glm/vec3.hpp>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <glm/vec3.hpp>
-#include <fstream>
-#include <sstream>
-#include <iostream>
 
 struct Frame {
-    glm::vec3 sun;
-    glm::vec3 earth;
-    glm::vec3 moon;
+  glm::vec3 sun;
+  glm::vec3 earth;
+  glm::vec3 moon;
 };
 
 class CSVLoader {
 public:
-    CSVLoader() = default;
+  CSVLoader() = default;
 
-    // Load from file path
-    std::vector<Frame> loadOrbitCSV(const std::string& path);
+  // Load from file path
+  std::vector<Frame> loadOrbitCSV(const std::string &path);
 
 private:
-    float scaleMeters = 1.0f / 5e9f;  // 1 GL unit = 5,000,000 km
+  float scaleMeters = 1.0f / 5e9f; // 1 GL unit = 5,000,000 km
 };
 
 #endif // CSV_LOADER_H

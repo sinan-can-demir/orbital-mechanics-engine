@@ -4,7 +4,7 @@
  * Modified by: Sinan Demir
  * File: ray.h
  * Date modified: 11/16/2025
- * 
+ *
  * Description:
  *   Header file defining a 3D ray class (`ray`) used in ray tracing.
  *   A ray is defined by an origin point and a direction vector.
@@ -35,54 +35,53 @@
  ***********************/
 class ray {
 public:
+  /***********************
+   * ray (default constructor)
+   * @brief Creates an empty ray with default-initialized origin and direction.
+   ***********************/
+  ray() {}
 
-    /***********************
-     * ray (default constructor)
-     * @brief Creates an empty ray with default-initialized origin and direction.
-     ***********************/
-    ray() {}
+  /***********************
+   * ray (constructor)
+   * @brief Creates a ray from a specified origin and direction.
+   * @param origin  Reference point where the ray starts.
+   * @param direction Direction vector of the ray.
+   * @note Direction does not need to be normalized, but some algorithms may
+   * assume it.
+   ***********************/
+  ray(const point3 &origin, const vec3 &direction)
+      : orig(origin), dir(direction) {}
 
-    /***********************
-     * ray (constructor)
-     * @brief Creates a ray from a specified origin and direction.
-     * @param origin  Reference point where the ray starts.
-     * @param direction Direction vector of the ray.
-     * @note Direction does not need to be normalized, but some algorithms may assume it.
-     ***********************/
-    ray(const point3& origin, const vec3& direction)
-        : orig(origin), dir(direction) {}
+  /***********************
+   * origin
+   * @brief Accessor for the ray’s origin.
+   * @return const reference to origin point.
+   ***********************/
+  const point3 &origin() const { return orig; }
 
-    /***********************
-     * origin
-     * @brief Accessor for the ray’s origin.
-     * @return const reference to origin point.
-     ***********************/
-    const point3& origin() const { return orig; }
+  /***********************
+   * direction
+   * @brief Accessor for the ray’s direction vector.
+   * @return const reference to direction vector.
+   ***********************/
+  const vec3 &direction() const { return dir; }
 
-    /***********************
-     * direction
-     * @brief Accessor for the ray’s direction vector.
-     * @return const reference to direction vector.
-     ***********************/
-    const vec3& direction() const { return dir; }
-
-    /***********************
-     * at
-     * @brief Computes the point along the ray at parameter t.
-     *
-     * Uses the formula: P(t) = O + t * D
-     *
-     * @param t Distance parameter along the ray.
-     * @return A point3 object representing the position at parameter t.
-     * @note If D is not normalized, t represents scaled units, not exact distance.
-     ***********************/
-    point3 at(double t) const {
-        return orig + t * dir;
-    }
+  /***********************
+   * at
+   * @brief Computes the point along the ray at parameter t.
+   *
+   * Uses the formula: P(t) = O + t * D
+   *
+   * @param t Distance parameter along the ray.
+   * @return A point3 object representing the position at parameter t.
+   * @note If D is not normalized, t represents scaled units, not exact
+   * distance.
+   ***********************/
+  point3 at(double t) const { return orig + t * dir; }
 
 private:
-    point3 orig;  // Ray origin in 3D space
-    vec3   dir;   // Ray direction vector
+  point3 orig; // Ray origin in 3D space
+  vec3 dir;    // Ray direction vector
 };
 
 #endif // RAY_H
