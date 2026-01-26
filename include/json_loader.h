@@ -8,10 +8,10 @@
 #ifndef ORBIT_SIM_JSON_LOADER_H
 #define ORBIT_SIM_JSON_LOADER_H
 
+#include "body.h" // CelestialBody
 #include <string>
 #include <vector>
-#include "body.h"   // CelestialBody
 
-std::vector<CelestialBody> loadSystemFromJSON(const std::string& path);
+std::vector<CelestialBody> loadSystemFromJSON(const std::string &path);
 
 #endif // ORBIT_SIM_JSON_LOADER_H

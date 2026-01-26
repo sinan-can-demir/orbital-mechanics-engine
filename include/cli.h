@@ -8,9 +8,9 @@
 #ifndef ORBIT_SIM_CLI_H
 #define ORBIT_SIM_CLI_H
 
-#include <string>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 /***********************
  * struct CLIOptions
@@ -25,27 +25,27 @@
  * @note: Additional fields can be added as needed.
  ***********************/
 struct CLIOptions {
-    std::string command;
-    std::string systemFile;
+  std::string command;
+  std::string systemFile;
 
-    int steps = 0;
-    double dt = 0;
+  int steps = 0;
+  double dt = 0;
 
-    // fetch
-    std::string fetchBody;
-    std::string fetchCenter;
-    std::string fetchStart;
-    std::string fetchStop;
-    std::string fetchStep;
-    std::string output;
+  // fetch
+  std::string fetchBody;
+  std::string fetchCenter;
+  std::string fetchStart;
+  std::string fetchStop;
+  std::string fetchStep;
+  std::string output;
 
-    bool usePost = false;
-    bool verbose = false;
-    bool normalize = false;
+  bool usePost = false;
+  bool verbose = false;
+  bool normalize = false;
 };
 
-CLIOptions parseCLI(int argc, char** argv);
+CLIOptions parseCLI(int argc, char **argv);
 void printGlobalHelp();
-void printCommandHelp(const std::string& command);
+void printCommandHelp(const std::string &command);
 
-#endif  // ORBIT_SIM_CLI_H
+#endif // ORBIT_SIM_CLI_H

@@ -20,15 +20,15 @@
  *      orbit exaggerated 15× around Earth for visibility
  *************************/
 
-#include <iostream>
-#include <vector>
-#include <string>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
-#include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glad/glad.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp> // includes glm::infinitePerspective
@@ -39,70 +39,70 @@
 // ---------------------------
 // Global Viewer State
 // ---------------------------
-static int   g_windowWidth  = 1280;
-static int   g_windowHeight = 720;
+static int g_windowWidth = 1280;
+static int g_windowHeight = 720;
 
 // Orbit camera spherical coords
-static float g_yaw    = glm::radians(45.0f);
-static float g_pitch  = glm::radians(20.0f);
-static float g_radius = 250.0f;   // distance from target (in GL units)
+static float g_yaw = glm::radians(45.0f);
+static float g_pitch = glm::radians(20.0f);
+static float g_radius = 250.0f; // distance from target (in GL units)
 
-static bool   g_mouseRotating = false;
+static bool g_mouseRotating = false;
 static double g_lastMouseX = 0.0;
 static double g_lastMouseY = 0.0;
 
 // Camera target selection
 enum class CameraTarget {
-    Barycenter = 0,
-    Sun,
-    Mercury,
-    Venus,
-    Earth,
-    Moon,
-    Mars,
-    Jupiter,
-    Saturn,
-    Uranus,
-    Neptune
+  Barycenter = 0,
+  Sun,
+  Mercury,
+  Venus,
+  Earth,
+  Moon,
+  Mars,
+  Jupiter,
+  Saturn,
+  Uranus,
+  Neptune
 };
 
 static CameraTarget g_cameraTarget = CameraTarget::Barycenter;
 
 // Legend rendering objects (2D)
 static GLuint g_legendShader = 0;
-static GLuint g_legendVAO    = 0;
-static GLuint g_legendVBO    = 0;
-static GLint  g_legLocOffset = -1;
-static GLint  g_legLocScale  = -1;
-static GLint  g_legLocColor  = -1;
+static GLuint g_legendVAO = 0;
+static GLuint g_legendVBO = 0;
+static GLint g_legLocOffset = -1;
+static GLint g_legLocScale = -1;
+static GLint g_legLocColor = -1;
 
 // Legend layout (in pixels)
-static const float LEGEND_BASE_X   = 28.0f;  // from left
-static const float LEGEND_BASE_Y   = 40.0f;  // from top
-static const float LEGEND_SPACING  = 24.0f;  // between rows
-static const float LEGEND_SIZE_PX  = 14.0f;  // base square size
+static const float LEGEND_BASE_X = 28.0f;  // from left
+static const float LEGEND_BASE_Y = 40.0f;  // from top
+static const float LEGEND_SPACING = 24.0f; // between rows
+static const float LEGEND_SIZE_PX = 14.0f; // base square size
 
 // --------------------------------------------------
 // N-body rendering data
 // --------------------------------------------------
 
 struct BodyRenderInfo {
-    std::string name;
-    glm::vec3   color;
-    float       radius;               // visual radius in GL units
-    std::vector<glm::vec3> positions; // per-frame positions in GL units
-    SphereMesh  mesh;
+  std::string name;
+  glm::vec3 color;
+  float radius;                     // visual radius in GL units
+  std::vector<glm::vec3> positions; // per-frame positions in GL units
+  SphereMesh mesh;
 };
 
-static std::vector<BodyRenderInfo>              g_bodies;
+static std::vector<BodyRenderInfo> g_bodies;
 static std::unordered_map<std::string, size_t> g_bodyIndex;
-static size_t                                   g_numFrames  = 0;
-static size_t                                   g_frameIndex = 0;
+static size_t g_numFrames = 0;
+static size_t g_frameIndex = 0;
 
 // Forward declarations
-static void      handleLegendClick(double mouseX, double mouseY);
-static glm::vec3 getBodyPos(const std::string& name);
-static bool      initBodiesFromCSV(const std::string& path);
+static void handleLegendClick(double mouseX, double mouseY);
+static glm::vec3 getBodyPos(const std::string &name);
+static bool initBodiesFromCSV(const std::string &path);
 
 // --------------------------------------------------
 // Callbacks
@@ -110,10 +110,10 @@ static bool      initBodiesFromCSV(const std::string& path);
 /**
  * @brief Handles window resize events by updating the viewport.
  */
-static void framebuffer_size_callback(GLFWwindow*, int w, int h) {
-    g_windowWidth  = w;
-    g_windowHeight = h;
-    glViewport(0, 0, w, h);
+static void framebuffer_size_callback(GLFWwindow *, int w, int h) {
+  g_windowWidth = w;
+  g_windowHeight = h;
+  glViewport(0, 0, w, h);
 }
 
 /**
@@ -121,48 +121,51 @@ static void framebuffer_size_callback(GLFWwindow*, int w, int h) {
  *  - RMB press/release → start/stop camera rotation
  *  - LMB press on legend → change camera target
  */
-static void mouse_button_callback(GLFWwindow* win, int button, int action, int /*mods*/) {
-    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-        if (action == GLFW_PRESS) {
-            g_mouseRotating = true;
-            glfwGetCursorPos(win, &g_lastMouseX, &g_lastMouseY);
-        } else if (action == GLFW_RELEASE) {
-            g_mouseRotating = false;
-        }
+static void mouse_button_callback(GLFWwindow *win, int button, int action,
+                                  int /*mods*/) {
+  if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+    if (action == GLFW_PRESS) {
+      g_mouseRotating = true;
+      glfwGetCursorPos(win, &g_lastMouseX, &g_lastMouseY);
+    } else if (action == GLFW_RELEASE) {
+      g_mouseRotating = false;
     }
+  }
 
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        double mx, my;
-        glfwGetCursorPos(win, &mx, &my);
-        handleLegendClick(mx, my);
-    }
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    double mx, my;
+    glfwGetCursorPos(win, &mx, &my);
+    handleLegendClick(mx, my);
+  }
 }
 
 /**
  * @brief Handles cursor position changes for mouse rotation.
  */
-static void cursor_pos_callback(GLFWwindow*, double xpos, double ypos) {
-    if (!g_mouseRotating) return;
-    double dx = xpos - g_lastMouseX;
-    double dy = ypos - g_lastMouseY;
+static void cursor_pos_callback(GLFWwindow *, double xpos, double ypos) {
+  if (!g_mouseRotating)
+    return;
+  double dx = xpos - g_lastMouseX;
+  double dy = ypos - g_lastMouseY;
 
-    g_lastMouseX = xpos;
-    g_lastMouseY = ypos;
+  g_lastMouseX = xpos;
+  g_lastMouseY = ypos;
 
-    g_yaw   += static_cast<float>(dx) * 0.005f;
-    g_pitch -= static_cast<float>(dy) * 0.005f;
+  g_yaw += static_cast<float>(dx) * 0.005f;
+  g_pitch -= static_cast<float>(dy) * 0.005f;
 
-    g_pitch = glm::clamp(g_pitch, glm::radians(-89.0f), glm::radians(89.0f));
+  g_pitch = glm::clamp(g_pitch, glm::radians(-89.0f), glm::radians(89.0f));
 }
 
 /**
  * @brief Mouse wheel zoom: scroll up = zoom in, scroll down = zoom out.
- *        Zoom speed adapts to current radius so inner / outer system feel usable.
+ *        Zoom speed adapts to current radius so inner / outer system feel
+ * usable.
  */
-static void scroll_callback(GLFWwindow*, double /*xoff*/, double yoff) {
-    float zoomSpeed = std::max(0.0000005f, g_radius * 0.1f);
-    g_radius -= static_cast<float>(yoff) * zoomSpeed;
-    g_radius = glm::clamp(g_radius, 0.00000001f, 100000.0f);
+static void scroll_callback(GLFWwindow *, double /*xoff*/, double yoff) {
+  float zoomSpeed = std::max(0.0000005f, g_radius * 0.1f);
+  g_radius -= static_cast<float>(yoff) * zoomSpeed;
+  g_radius = glm::clamp(g_radius, 0.00000001f, 100000.0f);
 }
 
 /**
@@ -170,24 +173,46 @@ static void scroll_callback(GLFWwindow*, double /*xoff*/, double yoff) {
  *  1 = Sun, 2 = Mercury, 3 = Venus, 4 = Earth, 5 = Moon,
  *  6 = Mars, 7 = Jupiter, 8 = Saturn, 9 = Uranus, 0 = Neptune
  */
-static void key_callback(GLFWwindow* /*win*/, int key, int /*scancode*/, int action, int /*mods*/) {
-    if (action != GLFW_PRESS) return;
+static void key_callback(GLFWwindow * /*win*/, int key, int /*scancode*/,
+                         int action, int /*mods*/) {
+  if (action != GLFW_PRESS)
+    return;
 
-    switch (key) {
-        case GLFW_KEY_1: g_cameraTarget = CameraTarget::Sun;     break;
-        case GLFW_KEY_2: g_cameraTarget = CameraTarget::Mercury; break;
-        case GLFW_KEY_3: g_cameraTarget = CameraTarget::Venus;   break;
-        case GLFW_KEY_4: g_cameraTarget = CameraTarget::Earth;   break;
-        case GLFW_KEY_5: g_cameraTarget = CameraTarget::Moon;    break;
-        case GLFW_KEY_6: g_cameraTarget = CameraTarget::Mars;    break;
-        case GLFW_KEY_7: g_cameraTarget = CameraTarget::Jupiter; break;
-        case GLFW_KEY_8: g_cameraTarget = CameraTarget::Saturn;  break;
-        case GLFW_KEY_9: g_cameraTarget = CameraTarget::Uranus;  break;
-        case GLFW_KEY_0: g_cameraTarget = CameraTarget::Neptune; break;
-        default: break;
-    }
+  switch (key) {
+  case GLFW_KEY_1:
+    g_cameraTarget = CameraTarget::Sun;
+    break;
+  case GLFW_KEY_2:
+    g_cameraTarget = CameraTarget::Mercury;
+    break;
+  case GLFW_KEY_3:
+    g_cameraTarget = CameraTarget::Venus;
+    break;
+  case GLFW_KEY_4:
+    g_cameraTarget = CameraTarget::Earth;
+    break;
+  case GLFW_KEY_5:
+    g_cameraTarget = CameraTarget::Moon;
+    break;
+  case GLFW_KEY_6:
+    g_cameraTarget = CameraTarget::Mars;
+    break;
+  case GLFW_KEY_7:
+    g_cameraTarget = CameraTarget::Jupiter;
+    break;
+  case GLFW_KEY_8:
+    g_cameraTarget = CameraTarget::Saturn;
+    break;
+  case GLFW_KEY_9:
+    g_cameraTarget = CameraTarget::Uranus;
+    break;
+  case GLFW_KEY_0:
+    g_cameraTarget = CameraTarget::Neptune;
+    break;
+  default:
+    break;
+  }
 }
-
 
 // --------------------------------------------------
 // Shader helpers
@@ -195,50 +220,49 @@ static void key_callback(GLFWwindow* /*win*/, int key, int /*scancode*/, int act
 /**
  * @brief Compiles a shader of given type from source code.
  */
-static GLuint compileShader(GLenum type, const char* src) {
-    GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, nullptr);
-    glCompileShader(s);
+static GLuint compileShader(GLenum type, const char *src) {
+  GLuint s = glCreateShader(type);
+  glShaderSource(s, 1, &src, nullptr);
+  glCompileShader(s);
 
-    GLint ok = 0;
-    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-    if (!ok) {
-        GLint len = 0;
-        glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
-        std::string log(len, '\0');
-        glGetShaderInfoLog(s, len, nullptr, log.data());
-        std::cerr << "❌ Shader error:\n" << log << "\n";
-    }
-    return s;
+  GLint ok = 0;
+  glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+  if (!ok) {
+    GLint len = 0;
+    glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
+    std::string log(len, '\0');
+    glGetShaderInfoLog(s, len, nullptr, log.data());
+    std::cerr << "❌ Shader error:\n" << log << "\n";
+  }
+  return s;
 }
 
 /**
  * @brief Creates an OpenGL program from a vertex + fragment shader pair.
  */
-static GLuint createProgram(const char* vsSrc, const char* fsSrc) {
-    GLuint vs = compileShader(GL_VERTEX_SHADER, vsSrc);
-    GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsSrc);
+static GLuint createProgram(const char *vsSrc, const char *fsSrc) {
+  GLuint vs = compileShader(GL_VERTEX_SHADER, vsSrc);
+  GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsSrc);
 
-    GLuint prog = glCreateProgram();
-    glAttachShader(prog, vs);
-    glAttachShader(prog, fs);
-    glLinkProgram(prog);
+  GLuint prog = glCreateProgram();
+  glAttachShader(prog, vs);
+  glAttachShader(prog, fs);
+  glLinkProgram(prog);
 
-    GLint ok = 0;
-    glGetProgramiv(prog, GL_LINK_STATUS, &ok);
-    if (!ok) {
-        GLint len = 0;
-        glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
-        std::string log(len, '\0');
-        glGetProgramInfoLog(prog, len, nullptr, log.data());
-        std::cerr << "❌ Link error:\n" << log << "\n";
-    }
+  GLint ok = 0;
+  glGetProgramiv(prog, GL_LINK_STATUS, &ok);
+  if (!ok) {
+    GLint len = 0;
+    glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+    std::string log(len, '\0');
+    glGetProgramInfoLog(prog, len, nullptr, log.data());
+    std::cerr << "❌ Link error:\n" << log << "\n";
+  }
 
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    return prog;
+  glDeleteShader(vs);
+  glDeleteShader(fs);
+  return prog;
 }
-
 
 // --------------------------------------------------
 // Legend helpers (2D quads in NDC)
@@ -250,7 +274,7 @@ static GLuint createProgram(const char* vsSrc, const char* fsSrc) {
  * Draws small colored squares in NDC that we then place in pixel space.
  */
 static void initLegendRenderer() {
-    const char* legendVs = R"GLSL(
+  const char *legendVs = R"GLSL(
         #version 330 core
         layout(location = 0) in vec2 aPos;
 
@@ -263,7 +287,7 @@ static void initLegendRenderer() {
         }
     )GLSL";
 
-    const char* legendFs = R"GLSL(
+  const char *legendFs = R"GLSL(
         #version 330 core
         out vec4 FragColor;
         uniform vec3 uColor;
@@ -273,37 +297,29 @@ static void initLegendRenderer() {
         }
     )GLSL";
 
-    g_legendShader = createProgram(legendVs, legendFs);
+  g_legendShader = createProgram(legendVs, legendFs);
 
-    g_legLocOffset = glGetUniformLocation(g_legendShader, "uOffset");
-    g_legLocScale  = glGetUniformLocation(g_legendShader, "uScale");
-    g_legLocColor  = glGetUniformLocation(g_legendShader, "uColor");
+  g_legLocOffset = glGetUniformLocation(g_legendShader, "uOffset");
+  g_legLocScale = glGetUniformLocation(g_legendShader, "uScale");
+  g_legLocColor = glGetUniformLocation(g_legendShader, "uColor");
 
-    // Unit square centered at origin, two triangles
-    float quadVerts[] = {
-        -0.5f, -0.5f,
-         0.5f, -0.5f,
-         0.5f,  0.5f,
+  // Unit square centered at origin, two triangles
+  float quadVerts[] = {-0.5f, -0.5f, 0.5f, -0.5f, 0.5f,  0.5f,
 
-        -0.5f, -0.5f,
-         0.5f,  0.5f,
-        -0.5f,  0.5f
-    };
+                       -0.5f, -0.5f, 0.5f, 0.5f,  -0.5f, 0.5f};
 
-    glGenVertexArrays(1, &g_legendVAO);
-    glGenBuffers(1, &g_legendVBO);
+  glGenVertexArrays(1, &g_legendVAO);
+  glGenBuffers(1, &g_legendVBO);
 
-    glBindVertexArray(g_legendVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, g_legendVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+  glBindVertexArray(g_legendVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, g_legendVBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-        0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0
-    );
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
 
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 /**
@@ -314,27 +330,27 @@ static void initLegendRenderer() {
  * @param sizePx    Square size in pixels.
  * @param color     RGB color.
  */
-static void drawLegendBox(float centerPx, float centerPy,
-                          float sizePx,
-                          const glm::vec3& color) {
-    if (g_windowWidth <= 0 || g_windowHeight <= 0) return;
+static void drawLegendBox(float centerPx, float centerPy, float sizePx,
+                          const glm::vec3 &color) {
+  if (g_windowWidth <= 0 || g_windowHeight <= 0)
+    return;
 
-    // Convert center in pixels → NDC
-    float x_ndc =  2.0f * centerPx / static_cast<float>(g_windowWidth) - 1.0f;
-    float y_ndc =  1.0f - 2.0f * centerPy / static_cast<float>(g_windowHeight);
+  // Convert center in pixels → NDC
+  float x_ndc = 2.0f * centerPx / static_cast<float>(g_windowWidth) - 1.0f;
+  float y_ndc = 1.0f - 2.0f * centerPy / static_cast<float>(g_windowHeight);
 
-    // Convert size in pixels → NDC scale (quad is [-0.5..0.5])
-    float sx = sizePx / static_cast<float>(g_windowWidth)  * 2.0f;
-    float sy = sizePx / static_cast<float>(g_windowHeight) * 2.0f;
+  // Convert size in pixels → NDC scale (quad is [-0.5..0.5])
+  float sx = sizePx / static_cast<float>(g_windowWidth) * 2.0f;
+  float sy = sizePx / static_cast<float>(g_windowHeight) * 2.0f;
 
-    glUseProgram(g_legendShader);
-    glUniform2f(g_legLocOffset, x_ndc, y_ndc);
-    glUniform2f(g_legLocScale,  sx, sy);
-    glUniform3fv(g_legLocColor, 1, glm::value_ptr(color));
+  glUseProgram(g_legendShader);
+  glUniform2f(g_legLocOffset, x_ndc, y_ndc);
+  glUniform2f(g_legLocScale, sx, sy);
+  glUniform3fv(g_legLocColor, 1, glm::value_ptr(color));
 
-    glBindVertexArray(g_legendVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+  glBindVertexArray(g_legendVAO);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+  glBindVertexArray(0);
 }
 
 /**
@@ -342,39 +358,39 @@ static void drawLegendBox(float centerPx, float centerPy,
  *        update camera target (Sun/Earth/Moon).
  */
 static void handleLegendClick(double mouseX, double mouseY) {
-    // Legend row centers in pixels
-    float centersY[3] = {
-        LEGEND_BASE_Y,
-        LEGEND_BASE_Y + LEGEND_SPACING,
-        LEGEND_BASE_Y + 2.0f * LEGEND_SPACING
-    };
+  // Legend row centers in pixels
+  float centersY[3] = {LEGEND_BASE_Y, LEGEND_BASE_Y + LEGEND_SPACING,
+                       LEGEND_BASE_Y + 2.0f * LEGEND_SPACING};
 
-    float halfSize = LEGEND_SIZE_PX * 0.5f;
-    float x0 = LEGEND_BASE_X - halfSize;
-    float x1 = LEGEND_BASE_X + halfSize;
+  float halfSize = LEGEND_SIZE_PX * 0.5f;
+  float x0 = LEGEND_BASE_X - halfSize;
+  float x1 = LEGEND_BASE_X + halfSize;
 
-    for (int i = 0; i < 3; ++i) {
-        float yCenter = centersY[i];
-        float y0 = yCenter - halfSize;
-        float y1 = yCenter + halfSize;
+  for (int i = 0; i < 3; ++i) {
+    float yCenter = centersY[i];
+    float y0 = yCenter - halfSize;
+    float y1 = yCenter + halfSize;
 
-        if (mouseX >= x0 && mouseX <= x1 &&
-            mouseY >= y0 && mouseY <= y1) {
+    if (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1) {
 
-            switch (i) {
-                case 0: g_cameraTarget = CameraTarget::Sun;   break;
-                case 1: g_cameraTarget = CameraTarget::Earth; break;
-                case 2: g_cameraTarget = CameraTarget::Moon;  break;
-            }
+      switch (i) {
+      case 0:
+        g_cameraTarget = CameraTarget::Sun;
+        break;
+      case 1:
+        g_cameraTarget = CameraTarget::Earth;
+        break;
+      case 2:
+        g_cameraTarget = CameraTarget::Moon;
+        break;
+      }
 
-            std::cout << "📌 Camera target set to "
-                      << (i == 0 ? "Sun" : (i == 1 ? "Earth" : "Moon"))
-                      << "\n";
-            return;
-        }
+      std::cout << "📌 Camera target set to "
+                << (i == 0 ? "Sun" : (i == 1 ? "Earth" : "Moon")) << "\n";
+      return;
     }
+  }
 }
-
 
 // --------------------------------------------------
 // Physical scaling & N-body helpers
@@ -393,51 +409,73 @@ static constexpr float DIST_VIS_SCALE = 0.02f;
 static constexpr float MOON_EXAGGERATION = 15.0f;
 
 // Color map for Solar System bodies
-static glm::vec3 colorForBody(const std::string& name) {
-    if (name == "Sun")     return {1.4f, 1.1f, 0.3f};
-    if (name == "Mercury") return {0.7f, 0.7f, 0.7f};
-    if (name == "Venus")   return {1.0f, 0.9f, 0.6f};
-    if (name == "Earth")   return {0.2f, 0.8f, 1.2f};
-    if (name == "Moon")    return {0.85f, 0.85f, 0.92f};
-    if (name == "Mars")    return {0.9f, 0.3f, 0.2f};
-    if (name == "Jupiter") return {1.0f, 0.7f, 0.4f};
-    if (name == "Saturn")  return {1.0f, 0.8f, 0.5f};
-    if (name == "Uranus")  return {0.5f, 0.8f, 1.0f};
-    if (name == "Neptune") return {0.3f, 0.4f, 1.0f};
-    return {1.0f, 1.0f, 1.0f};
+static glm::vec3 colorForBody(const std::string &name) {
+  if (name == "Sun")
+    return {1.4f, 1.1f, 0.3f};
+  if (name == "Mercury")
+    return {0.7f, 0.7f, 0.7f};
+  if (name == "Venus")
+    return {1.0f, 0.9f, 0.6f};
+  if (name == "Earth")
+    return {0.2f, 0.8f, 1.2f};
+  if (name == "Moon")
+    return {0.85f, 0.85f, 0.92f};
+  if (name == "Mars")
+    return {0.9f, 0.3f, 0.2f};
+  if (name == "Jupiter")
+    return {1.0f, 0.7f, 0.4f};
+  if (name == "Saturn")
+    return {1.0f, 0.8f, 0.5f};
+  if (name == "Uranus")
+    return {0.5f, 0.8f, 1.0f};
+  if (name == "Neptune")
+    return {0.3f, 0.4f, 1.0f};
+  return {1.0f, 1.0f, 1.0f};
 }
 
 // Physical radii in meters → GL units (no exaggeration)
-static float radiusForBody(const std::string& name) {
-    float r_m = 6.0e6f; // default ~Earth-sized as fallback
+static float radiusForBody(const std::string &name) {
+  float r_m = 6.0e6f; // default ~Earth-sized as fallback
 
-    if (name == "Sun")        r_m = 6.9634e8f;
-    else if (name == "Mercury") r_m = 2.4397e6f;
-    else if (name == "Venus")   r_m = 6.0518e6f;
-    else if (name == "Earth")   r_m = 6.3710e6f;
-    else if (name == "Moon")    r_m = 1.7374e6f;
-    else if (name == "Mars")    r_m = 3.3895e6f;
-    else if (name == "Jupiter") r_m = 6.9911e7f;
-    else if (name == "Saturn")  r_m = 5.8232e7f;
-    else if (name == "Uranus")  r_m = 2.5362e7f;
-    else if (name == "Neptune") r_m = 2.4622e7f;
+  if (name == "Sun")
+    r_m = 6.9634e8f;
+  else if (name == "Mercury")
+    r_m = 2.4397e6f;
+  else if (name == "Venus")
+    r_m = 6.0518e6f;
+  else if (name == "Earth")
+    r_m = 6.3710e6f;
+  else if (name == "Moon")
+    r_m = 1.7374e6f;
+  else if (name == "Mars")
+    r_m = 3.3895e6f;
+  else if (name == "Jupiter")
+    r_m = 6.9911e7f;
+  else if (name == "Saturn")
+    r_m = 5.8232e7f;
+  else if (name == "Uranus")
+    r_m = 2.5362e7f;
+  else if (name == "Neptune")
+    r_m = 2.4622e7f;
 
-    // meters → GL units (no extra radius exaggeration)
-    return r_m * DIST_SCALE_METERS;
+  // meters → GL units (no extra radius exaggeration)
+  return r_m * DIST_SCALE_METERS;
 }
 
 /**
- * @brief Returns the current position of a body (in GL units) for the active frame.
- *        If body is missing or has no data, returns (0,0,0).
+ * @brief Returns the current position of a body (in GL units) for the active
+ * frame. If body is missing or has no data, returns (0,0,0).
  */
-static glm::vec3 getBodyPos(const std::string& name) {
-    auto it = g_bodyIndex.find(name);
-    if (it == g_bodyIndex.end()) return glm::vec3(0.0f);
-    size_t idx = it->second;
-    if (g_bodies.empty() || g_bodies[idx].positions.empty()) return glm::vec3(0.0f);
+static glm::vec3 getBodyPos(const std::string &name) {
+  auto it = g_bodyIndex.find(name);
+  if (it == g_bodyIndex.end())
+    return glm::vec3(0.0f);
+  size_t idx = it->second;
+  if (g_bodies.empty() || g_bodies[idx].positions.empty())
+    return glm::vec3(0.0f);
 
-    size_t frame = (g_numFrames == 0) ? 0 : (g_frameIndex % g_numFrames);
-    return g_bodies[idx].positions[frame];
+  size_t frame = (g_numFrames == 0) ? 0 : (g_frameIndex % g_numFrames);
+  return g_bodies[idx].positions[frame];
 }
 
 /**
@@ -447,130 +485,129 @@ static glm::vec3 getBodyPos(const std::string& name) {
  *        - Compresses distances (2%) for visibility
  *        - Optionally exaggerates Moon orbit for visibility
  */
-static bool initBodiesFromCSV(const std::string& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "❌ Could not open CSV: " << path << "\n";
-        return false;
+static bool initBodiesFromCSV(const std::string &path) {
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    std::cerr << "❌ Could not open CSV: " << path << "\n";
+    return false;
+  }
+
+  std::string line;
+  if (!std::getline(file, line)) {
+    std::cerr << "⚠️ Empty CSV: " << path << "\n";
+    return false;
+  }
+
+  std::stringstream header(line);
+  std::vector<std::string> columns;
+  std::string col;
+  while (std::getline(header, col, ',')) {
+    columns.push_back(col);
+  }
+
+  // Identify body columns: x_name,y_name,z_name groups.
+  struct Triplet {
+    int ix, iy, iz;
+  };
+  std::vector<Triplet> bodyCols;
+
+  for (size_t i = 0; i + 2 < columns.size(); ++i) {
+    if (columns[i].rfind("x_", 0) == 0) {
+      std::string name = columns[i].substr(2);
+      int ix = static_cast<int>(i);
+      int iy = static_cast<int>(i + 1);
+      int iz = static_cast<int>(i + 2);
+
+      BodyRenderInfo body;
+      body.name = name;
+      body.color = colorForBody(name);
+      body.radius = radiusForBody(name);
+
+      g_bodyIndex[name] = static_cast<size_t>(g_bodies.size());
+      g_bodies.push_back(std::move(body));
+      bodyCols.push_back({ix, iy, iz});
+    }
+  }
+
+  if (g_bodies.empty()) {
+    std::cerr << "⚠️ No x_* body columns found in CSV header.\n";
+    return false;
+  }
+
+  constexpr float SCALE_METERS = DIST_SCALE_METERS;
+
+  size_t lineCount = 0;
+  while (std::getline(file, line)) {
+    if (line.empty())
+      continue;
+    std::stringstream ss(line);
+    std::vector<double> rowValues;
+    std::string v;
+    while (std::getline(ss, v, ',')) {
+      try {
+        rowValues.push_back(std::stod(v));
+      } catch (...) {
+        rowValues.push_back(0.0);
+      }
     }
 
-    std::string line;
-    if (!std::getline(file, line)) {
-        std::cerr << "⚠️ Empty CSV: " << path << "\n";
-        return false;
+    if (rowValues.size() < columns.size()) {
+      // malformed row, skip
+      continue;
     }
 
-    std::stringstream header(line);
-    std::vector<std::string> columns;
-    std::string col;
-    while (std::getline(header, col, ',')) {
-        columns.push_back(col);
+    // Per-frame positions for all bodies (scaled).
+    std::vector<glm::vec3> framePos(g_bodies.size(), glm::vec3(0.0f));
+
+    // First, load raw scaled positions.
+    for (size_t bi = 0; bi < g_bodies.size(); ++bi) {
+      const auto &trips = bodyCols[bi];
+      double x = rowValues[trips.ix];
+      double y = rowValues[trips.iy];
+      double z = rowValues[trips.iz];
+
+      glm::vec3 p(static_cast<float>(x * SCALE_METERS),
+                  static_cast<float>(y * SCALE_METERS),
+                  static_cast<float>(z * SCALE_METERS));
+
+      // ----------------------------------------
+      // ✨ VISUAL DISTANCE COMPRESSION (2%)
+      // ----------------------------------------
+      // This keeps all orbital shapes and relative geometry,
+      // but pulls the whole system closer to the camera so
+      // Jupiter / Saturn / Uranus / Neptune are actually visible.
+      p *= DIST_VIS_SCALE;
+
+      framePos[bi] = p;
     }
 
-    // Identify body columns: x_name,y_name,z_name groups.
-    struct Triplet { int ix, iy, iz; };
-    std::vector<Triplet> bodyCols;
-
-    for (size_t i = 0; i + 2 < columns.size(); ++i) {
-        if (columns[i].rfind("x_", 0) == 0) {
-            std::string name = columns[i].substr(2);
-            int ix = static_cast<int>(i);
-            int iy = static_cast<int>(i + 1);
-            int iz = static_cast<int>(i + 2);
-
-            BodyRenderInfo body;
-            body.name   = name;
-            body.color  = colorForBody(name);
-            body.radius = radiusForBody(name);
-
-            g_bodyIndex[name] = static_cast<size_t>(g_bodies.size());
-            g_bodies.push_back(std::move(body));
-            bodyCols.push_back({ix, iy, iz});
-        }
+    // Exaggerate Moon orbit if both Earth and Moon exist.
+    if (MOON_EXAGGERATION != 1.0f) {
+      auto itEarth = g_bodyIndex.find("Earth");
+      auto itMoon = g_bodyIndex.find("Moon");
+      if (itEarth != g_bodyIndex.end() && itMoon != g_bodyIndex.end()) {
+        size_t eIdx = itEarth->second;
+        size_t mIdx = itMoon->second;
+        glm::vec3 earthPos = framePos[eIdx];
+        glm::vec3 moonPos = framePos[mIdx];
+        glm::vec3 offset = moonPos - earthPos;
+        framePos[mIdx] = earthPos + offset * MOON_EXAGGERATION;
+      }
     }
 
-    if (g_bodies.empty()) {
-        std::cerr << "⚠️ No x_* body columns found in CSV header.\n";
-        return false;
+    // Append frame positions to each body.
+    for (size_t bi = 0; bi < g_bodies.size(); ++bi) {
+      g_bodies[bi].positions.push_back(framePos[bi]);
     }
 
-    constexpr float SCALE_METERS = DIST_SCALE_METERS;
+    ++lineCount;
+  }
 
-    size_t lineCount = 0;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        std::stringstream ss(line);
-        std::vector<double> rowValues;
-        std::string v;
-        while (std::getline(ss, v, ',')) {
-            try {
-                rowValues.push_back(std::stod(v));
-            } catch (...) {
-                rowValues.push_back(0.0);
-            }
-        }
-
-        if (rowValues.size() < columns.size()) {
-            // malformed row, skip
-            continue;
-        }
-
-        // Per-frame positions for all bodies (scaled).
-        std::vector<glm::vec3> framePos(g_bodies.size(), glm::vec3(0.0f));
-
-        // First, load raw scaled positions.
-        for (size_t bi = 0; bi < g_bodies.size(); ++bi) {
-            const auto& trips = bodyCols[bi];
-            double x = rowValues[trips.ix];
-            double y = rowValues[trips.iy];
-            double z = rowValues[trips.iz];
-
-            glm::vec3 p(
-                static_cast<float>(x * SCALE_METERS),
-                static_cast<float>(y * SCALE_METERS),
-                static_cast<float>(z * SCALE_METERS)
-            );
-
-            // ----------------------------------------
-            // ✨ VISUAL DISTANCE COMPRESSION (2%)
-            // ----------------------------------------
-            // This keeps all orbital shapes and relative geometry,
-            // but pulls the whole system closer to the camera so
-            // Jupiter / Saturn / Uranus / Neptune are actually visible.
-            p *= DIST_VIS_SCALE;
-
-            framePos[bi] = p;
-        }
-
-        // Exaggerate Moon orbit if both Earth and Moon exist.
-        if (MOON_EXAGGERATION != 1.0f) {
-            auto itEarth = g_bodyIndex.find("Earth");
-            auto itMoon  = g_bodyIndex.find("Moon");
-            if (itEarth != g_bodyIndex.end() && itMoon != g_bodyIndex.end()) {
-                size_t eIdx = itEarth->second;
-                size_t mIdx = itMoon->second;
-                glm::vec3 earthPos = framePos[eIdx];
-                glm::vec3 moonPos  = framePos[mIdx];
-                glm::vec3 offset   = moonPos - earthPos;
-                framePos[mIdx]     = earthPos + offset * MOON_EXAGGERATION;
-            }
-        }
-
-        // Append frame positions to each body.
-        for (size_t bi = 0; bi < g_bodies.size(); ++bi) {
-            g_bodies[bi].positions.push_back(framePos[bi]);
-        }
-
-        ++lineCount;
-    }
-
-    g_numFrames = lineCount;
-    std::cout << "📄 Loaded " << g_numFrames
-              << " frames for " << g_bodies.size()
-              << " bodies from " << path << "\n";
-    return (g_numFrames > 0);
+  g_numFrames = lineCount;
+  std::cout << "📄 Loaded " << g_numFrames << " frames for " << g_bodies.size()
+            << " bodies from " << path << "\n";
+  return (g_numFrames > 0);
 }
-
 
 // --------------------------------------------------
 // MAIN
@@ -579,56 +616,56 @@ static bool initBodiesFromCSV(const std::string& path) {
  * @brief Entry point for the Orbit Viewer application.
  */
 int main() {
-    // Init N-body positions first (Solar System) from simulation output
-    if (!initBodiesFromCSV("./build/orbit_three_body.csv")) {
-        return -1;
-    }
+  // Init N-body positions first (Solar System) from simulation output
+  if (!initBodiesFromCSV("./build/orbit_three_body.csv")) {
+    return -1;
+  }
 
-    // ----------------- GLFW init -----------------
-    if (!glfwInit()) {
-        std::cerr << "❌ Failed to init GLFW\n";
-        return -1;
-    }
+  // ----------------- GLFW init -----------------
+  if (!glfwInit()) {
+    std::cerr << "❌ Failed to init GLFW\n";
+    return -1;
+  }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* win =
-        glfwCreateWindow(g_windowWidth, g_windowHeight,
-                         "Orbit Viewer (Solar System N-body)", nullptr, nullptr);
+  GLFWwindow *win =
+      glfwCreateWindow(g_windowWidth, g_windowHeight,
+                       "Orbit Viewer (Solar System N-body)", nullptr, nullptr);
 
-    if (!win) {
-        std::cerr << "❌ Failed to create window\n";
-        glfwTerminate();
-        return -1;
-    }
+  if (!win) {
+    std::cerr << "❌ Failed to create window\n";
+    glfwTerminate();
+    return -1;
+  }
 
-    glfwMakeContextCurrent(win);
-    glfwSetFramebufferSizeCallback(win, framebuffer_size_callback);
-    glfwSetMouseButtonCallback(win, mouse_button_callback);
-    glfwSetCursorPosCallback(win, cursor_pos_callback);
-    glfwSetScrollCallback(win, scroll_callback);
-    glfwSetKeyCallback(win, key_callback);
+  glfwMakeContextCurrent(win);
+  glfwSetFramebufferSizeCallback(win, framebuffer_size_callback);
+  glfwSetMouseButtonCallback(win, mouse_button_callback);
+  glfwSetCursorPosCallback(win, cursor_pos_callback);
+  glfwSetScrollCallback(win, scroll_callback);
+  glfwSetKeyCallback(win, key_callback);
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "❌ Failed to init GLAD\n";
-        glfwDestroyWindow(win);
-        glfwTerminate();
-        return -1;
-    }
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    std::cerr << "❌ Failed to init GLAD\n";
+    glfwDestroyWindow(win);
+    glfwTerminate();
+    return -1;
+  }
 
-    glEnable(GL_DEPTH_TEST);
+  glEnable(GL_DEPTH_TEST);
 
-    // Build sphere meshes for all bodies now that we have a valid GL context
-    for (auto& body : g_bodies) {
-        body.mesh.build(body.radius, 32, 32);
-    }
+  // Build sphere meshes for all bodies now that we have a valid GL context
+  for (auto &body : g_bodies) {
+    body.mesh.build(body.radius, 32, 32);
+  }
 
-    // ----------------------------------------------------
-    // Create main 3D shader (Option C lighting)
-    // ----------------------------------------------------
-    const char* vsSrc = R"GLSL(
+  // ----------------------------------------------------
+  // Create main 3D shader (Option C lighting)
+  // ----------------------------------------------------
+  const char *vsSrc = R"GLSL(
         #version 330 core
         layout(location = 0) in vec3 aPos;
         layout(location = 1) in vec3 aNormal;
@@ -647,7 +684,7 @@ int main() {
         }
     )GLSL";
 
-    const char* fsSrc = R"GLSL(
+  const char *fsSrc = R"GLSL(
         #version 330 core
 
         in vec3 vNormal;
@@ -686,138 +723,150 @@ int main() {
         }
     )GLSL";
 
-    GLuint shader = createProgram(vsSrc, fsSrc);
-    GLint locMVP     = glGetUniformLocation(shader, "uMVP");
-    GLint locModel   = glGetUniformLocation(shader, "uModel");
-    GLint locColor   = glGetUniformLocation(shader, "uColor");
-    GLint locLight   = glGetUniformLocation(shader, "uLightPos");
-    GLint locViewPos = glGetUniformLocation(shader, "uViewPos");
+  GLuint shader = createProgram(vsSrc, fsSrc);
+  GLint locMVP = glGetUniformLocation(shader, "uMVP");
+  GLint locModel = glGetUniformLocation(shader, "uModel");
+  GLint locColor = glGetUniformLocation(shader, "uColor");
+  GLint locLight = glGetUniformLocation(shader, "uLightPos");
+  GLint locViewPos = glGetUniformLocation(shader, "uViewPos");
 
-    // ----------------------------------------------------
-    // Init legend renderer (2D colored boxes in NDC)
-    // ----------------------------------------------------
-    initLegendRenderer();
+  // ----------------------------------------------------
+  // Init legend renderer (2D colored boxes in NDC)
+  // ----------------------------------------------------
+  initLegendRenderer();
 
-    // ----------------------------------------------------
-    // Main render loop
-    // ----------------------------------------------------
-    while (!glfwWindowShouldClose(win)) {
-        glfwPollEvents();
+  // ----------------------------------------------------
+  // Main render loop
+  // ----------------------------------------------------
+  while (!glfwWindowShouldClose(win)) {
+    glfwPollEvents();
 
-        if (g_numFrames > 0) {
-            g_frameIndex = (g_frameIndex + 1) % g_numFrames;
-        }
-
-        glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // deep navy space
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        if (!g_bodies.empty() && g_numFrames > 0) {
-            // Determine camera target position
-            glm::vec3 target(0.0f);
-            switch (g_cameraTarget) {
-                case CameraTarget::Sun:     target = getBodyPos("Sun");     break;
-                case CameraTarget::Mercury: target = getBodyPos("Mercury"); break;
-                case CameraTarget::Venus:   target = getBodyPos("Venus");   break;
-                case CameraTarget::Earth:   target = getBodyPos("Earth");   break;
-                case CameraTarget::Moon:    target = getBodyPos("Moon");    break;
-                case CameraTarget::Mars:    target = getBodyPos("Mars");    break;
-                case CameraTarget::Jupiter: target = getBodyPos("Jupiter"); break;
-                case CameraTarget::Saturn:  target = getBodyPos("Saturn");  break;
-                case CameraTarget::Uranus:  target = getBodyPos("Uranus");  break;
-                case CameraTarget::Neptune: target = getBodyPos("Neptune"); break;
-                case CameraTarget::Barycenter:
-                default:
-                    target = glm::vec3(0.0f);
-                    break;
-            }
-
-            // Camera offset in local spherical coords
-            glm::vec3 camOffset(
-                g_radius * cos(g_pitch) * sin(g_yaw),
-                g_radius * sin(g_pitch),
-                g_radius * cos(g_pitch) * cos(g_yaw)
-            );
-
-            glm::vec3 camPos = target + camOffset;
-
-            float aspect = float(g_windowWidth) / float(g_windowHeight);
-
-            // Reverse-Z style infinite perspective: tiny near plane, infinite far.
-            glm::mat4 proj = glm::infinitePerspective(
-                glm::radians(45.0f),
-                aspect,
-                0.000001f   // near plane in GL units
-            );
-
-            glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
-
-            glUseProgram(shader);
-
-            // view position for specular
-            glUniform3fv(locViewPos, 1, glm::value_ptr(camPos));
-            // light at Sun position (or origin if missing)
-            glm::vec3 sunPos = getBodyPos("Sun");
-            glUniform3fv(locLight, 1, glm::value_ptr(sunPos));
-
-            // ---------------- N-body draw ----------------
-            size_t frame = g_frameIndex % g_numFrames;
-            for (auto& body : g_bodies) {
-                if (frame >= body.positions.size()) continue;
-                glm::mat4 model = glm::translate(glm::mat4(1.0f),
-                                                 body.positions[frame]);
-                glm::mat4 mvp   = proj * view * model;
-                glUniformMatrix4fv(locMVP,   1, GL_FALSE, glm::value_ptr(mvp));
-                glUniformMatrix4fv(locModel, 1, GL_FALSE, glm::value_ptr(model));
-                glUniform3fv(locColor, 1, glm::value_ptr(body.color));
-                body.mesh.draw();
-            }
-        }
-
-        // ------------------------------------------------
-        // HUD legend (Sun / Earth / Moon) – top-left
-        // ------------------------------------------------
-        glDisable(GL_DEPTH_TEST);
-
-        float size      = LEGEND_SIZE_PX;
-        float sizeSel   = LEGEND_SIZE_PX * 1.4f; // highlight selected
-
-        float y0 = LEGEND_BASE_Y;
-        float y1 = LEGEND_BASE_Y + LEGEND_SPACING;
-        float y2 = LEGEND_BASE_Y + 2.0f * LEGEND_SPACING;
-
-        // Sun icon (top)
-        drawLegendBox(
-            LEGEND_BASE_X, y0,
-            (g_cameraTarget == CameraTarget::Sun ? sizeSel : size),
-            glm::vec3(1.4f, 1.1f, 0.3f)
-        );
-
-        // Earth icon (middle)
-        drawLegendBox(
-            LEGEND_BASE_X, y1,
-            (g_cameraTarget == CameraTarget::Earth ? sizeSel : size),
-            glm::vec3(0.2f, 0.8f, 1.2f)
-        );
-
-        // Moon icon (bottom)
-        drawLegendBox(
-            LEGEND_BASE_X, y2,
-            (g_cameraTarget == CameraTarget::Moon ? sizeSel : size),
-            glm::vec3(0.85f, 0.85f, 0.92f)
-        );
-
-        glEnable(GL_DEPTH_TEST);
-
-        glfwSwapBuffers(win);
+    if (g_numFrames > 0) {
+      g_frameIndex = (g_frameIndex + 1) % g_numFrames;
     }
 
-    glfwDestroyWindow(win);
+    glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // deep navy space
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // cleanup legend objects
-    glDeleteBuffers(1, &g_legendVBO);
-    glDeleteVertexArrays(1, &g_legendVAO);
-    glDeleteProgram(g_legendShader);
+    if (!g_bodies.empty() && g_numFrames > 0) {
+      // Determine camera target position
+      glm::vec3 target(0.0f);
+      switch (g_cameraTarget) {
+      case CameraTarget::Sun:
+        target = getBodyPos("Sun");
+        break;
+      case CameraTarget::Mercury:
+        target = getBodyPos("Mercury");
+        break;
+      case CameraTarget::Venus:
+        target = getBodyPos("Venus");
+        break;
+      case CameraTarget::Earth:
+        target = getBodyPos("Earth");
+        break;
+      case CameraTarget::Moon:
+        target = getBodyPos("Moon");
+        break;
+      case CameraTarget::Mars:
+        target = getBodyPos("Mars");
+        break;
+      case CameraTarget::Jupiter:
+        target = getBodyPos("Jupiter");
+        break;
+      case CameraTarget::Saturn:
+        target = getBodyPos("Saturn");
+        break;
+      case CameraTarget::Uranus:
+        target = getBodyPos("Uranus");
+        break;
+      case CameraTarget::Neptune:
+        target = getBodyPos("Neptune");
+        break;
+      case CameraTarget::Barycenter:
+      default:
+        target = glm::vec3(0.0f);
+        break;
+      }
 
-    glfwTerminate();
-    return 0;
+      // Camera offset in local spherical coords
+      glm::vec3 camOffset(g_radius * cos(g_pitch) * sin(g_yaw),
+                          g_radius * sin(g_pitch),
+                          g_radius * cos(g_pitch) * cos(g_yaw));
+
+      glm::vec3 camPos = target + camOffset;
+
+      float aspect = float(g_windowWidth) / float(g_windowHeight);
+
+      // Reverse-Z style infinite perspective: tiny near plane, infinite far.
+      glm::mat4 proj =
+          glm::infinitePerspective(glm::radians(45.0f), aspect,
+                                   0.000001f // near plane in GL units
+          );
+
+      glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
+
+      glUseProgram(shader);
+
+      // view position for specular
+      glUniform3fv(locViewPos, 1, glm::value_ptr(camPos));
+      // light at Sun position (or origin if missing)
+      glm::vec3 sunPos = getBodyPos("Sun");
+      glUniform3fv(locLight, 1, glm::value_ptr(sunPos));
+
+      // ---------------- N-body draw ----------------
+      size_t frame = g_frameIndex % g_numFrames;
+      for (auto &body : g_bodies) {
+        if (frame >= body.positions.size())
+          continue;
+        glm::mat4 model =
+            glm::translate(glm::mat4(1.0f), body.positions[frame]);
+        glm::mat4 mvp = proj * view * model;
+        glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(mvp));
+        glUniformMatrix4fv(locModel, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform3fv(locColor, 1, glm::value_ptr(body.color));
+        body.mesh.draw();
+      }
+    }
+
+    // ------------------------------------------------
+    // HUD legend (Sun / Earth / Moon) – top-left
+    // ------------------------------------------------
+    glDisable(GL_DEPTH_TEST);
+
+    float size = LEGEND_SIZE_PX;
+    float sizeSel = LEGEND_SIZE_PX * 1.4f; // highlight selected
+
+    float y0 = LEGEND_BASE_Y;
+    float y1 = LEGEND_BASE_Y + LEGEND_SPACING;
+    float y2 = LEGEND_BASE_Y + 2.0f * LEGEND_SPACING;
+
+    // Sun icon (top)
+    drawLegendBox(LEGEND_BASE_X, y0,
+                  (g_cameraTarget == CameraTarget::Sun ? sizeSel : size),
+                  glm::vec3(1.4f, 1.1f, 0.3f));
+
+    // Earth icon (middle)
+    drawLegendBox(LEGEND_BASE_X, y1,
+                  (g_cameraTarget == CameraTarget::Earth ? sizeSel : size),
+                  glm::vec3(0.2f, 0.8f, 1.2f));
+
+    // Moon icon (bottom)
+    drawLegendBox(LEGEND_BASE_X, y2,
+                  (g_cameraTarget == CameraTarget::Moon ? sizeSel : size),
+                  glm::vec3(0.85f, 0.85f, 0.92f));
+
+    glEnable(GL_DEPTH_TEST);
+
+    glfwSwapBuffers(win);
+  }
+
+  glfwDestroyWindow(win);
+
+  // cleanup legend objects
+  glDeleteBuffers(1, &g_legendVBO);
+  glDeleteVertexArrays(1, &g_legendVAO);
+  glDeleteProgram(g_legendShader);
+
+  glfwTerminate();
+  return 0;
 }

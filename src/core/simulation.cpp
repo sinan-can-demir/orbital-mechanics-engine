@@ -6,21 +6,23 @@
  *****************/
 
 #include "simulation.h"
-#include "vec3.h"
 #include "eclipse.h"
+#include "vec3.h"
 
 /****************
  * struct StateDerivative
- * Purpose: Captures instantaneous derivatives for position and velocity components.
+ * Purpose: Captures instantaneous derivatives for position and velocity
+ * components.
  *****************/
 struct StateDerivative {
-    vec3 dpos;  ///< Time derivative of position (velocity)
-    vec3 dvel;  ///< Time derivative of velocity (acceleration)
+  vec3 dpos; ///< Time derivative of position (velocity)
+  vec3 dvel; ///< Time derivative of velocity (acceleration)
 };
 
 /***********************
  * computeGravitationalForce
- * @brief: Computes mutual gravitational acceleration between two celestial bodies.
+ * @brief: Computes mutual gravitational acceleration between two celestial
+ * bodies.
  * @param: a - first body (acceleration will be updated)
  * @param: b - second body (acceleration will be updated)
  * @exception: none
@@ -29,53 +31,54 @@ struct StateDerivative {
  *        This function is intended to be called with i < j in an outer loop
  *        to preserve momentum symmetry and avoid double-counting.
  ***********************/
-void computeGravitationalForce(CelestialBody& a, CelestialBody& b) {
-    // Vector from a to b
-    vec3 r_vec = b.position - a.position;
-    double r2   = r_vec.length_squared();
+void computeGravitationalForce(CelestialBody &a, CelestialBody &b) {
+  // Vector from a to b
+  vec3 r_vec = b.position - a.position;
+  double r2 = r_vec.length_squared();
 
-    if (r2 < 1.0) {
-        // Avoid singularities or extremely close approaches
-        return;
-    }
+  if (r2 < 1.0) {
+    // Avoid singularities or extremely close approaches
+    return;
+  }
 
-    double r     = std::sqrt(r2);
-    double invr  = 1.0 / r;
-    double invr3 = invr / r2;   // 1 / r^3
+  double r = std::sqrt(r2);
+  double invr = 1.0 / r;
+  double invr3 = invr / r2; // 1 / r^3
 
-    // Acceleration directions:
-    // a.acc =  G * m_b / r^3 * r_vec
-    // b.acc = -G * m_a / r^3 * r_vec
-    vec3 acc_dir = r_vec;
+  // Acceleration directions:
+  // a.acc =  G * m_b / r^3 * r_vec
+  // b.acc = -G * m_a / r^3 * r_vec
+  vec3 acc_dir = r_vec;
 
-    vec3 acc_a = (physics::constants::G * b.mass * invr3) * acc_dir;
-    vec3 acc_b = (physics::constants::G * a.mass * invr3) * (-acc_dir);
+  vec3 acc_a = (physics::constants::G * b.mass * invr3) * acc_dir;
+  vec3 acc_b = (physics::constants::G * a.mass * invr3) * (-acc_dir);
 
-    a.acceleration += acc_a;
-    b.acceleration += acc_b;
+  a.acceleration += acc_a;
+  b.acceleration += acc_b;
 }
 
 /***********************
  * eulerStep
- * @brief: Simple Euler integration step (unused in main loop but kept for reference).
+ * @brief: Simple Euler integration step (unused in main loop but kept for
+ * reference).
  * @param: body - CelestialBody reference
  * @param: dt   - time step
  * @exception none
  * @return none
  ***********************/
-void eulerStep(CelestialBody& body, double dt) {
-    body.velocity += body.acceleration * dt;
-    body.position += body.velocity     * dt;
+void eulerStep(CelestialBody &body, double dt) {
+  body.velocity += body.acceleration * dt;
+  body.position += body.velocity * dt;
 }
 
 /***********************
  * resetAccelerations
  * @brief: Sets acceleration vectors to zero for every body in the collection.
  ***********************/
-void resetAccelerations(std::vector<CelestialBody>& bodies) {
-    for (auto& b : bodies) {
-        b.acceleration = vec3(0.0, 0.0, 0.0);
-    }
+void resetAccelerations(std::vector<CelestialBody> &bodies) {
+  for (auto &b : bodies) {
+    b.acceleration = vec3(0.0, 0.0, 0.0);
+  }
 }
 
 /***********************
@@ -84,15 +87,15 @@ void resetAccelerations(std::vector<CelestialBody>& bodies) {
  * @note: Uses computeGravitationalForce pairwise with i < j
  *        to ensure Newton's 3rd law and avoid double-counting.
  ***********************/
-void updateAccelerations(std::vector<CelestialBody>& bodies) {
-    resetAccelerations(bodies);
+void updateAccelerations(std::vector<CelestialBody> &bodies) {
+  resetAccelerations(bodies);
 
-    const std::size_t N = bodies.size();
-    for (std::size_t i = 0; i < N; ++i) {
-        for (std::size_t j = i + 1; j < N; ++j) {
-            computeGravitationalForce(bodies[i], bodies[j]);
-        }
+  const std::size_t N = bodies.size();
+  for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t j = i + 1; j < N; ++j) {
+      computeGravitationalForce(bodies[i], bodies[j]);
     }
+  }
 }
 
 /***********************
@@ -101,15 +104,16 @@ void updateAccelerations(std::vector<CelestialBody>& bodies) {
  * @param: bodies - current state
  * @return: vector of StateDerivative (dpos, dvel) for each body
  ***********************/
-std::vector<StateDerivative> evaluateDerivatives(std::vector<CelestialBody>& bodies) {
-    updateAccelerations(bodies);
-    std::vector<StateDerivative> d(bodies.size());
+std::vector<StateDerivative>
+evaluateDerivatives(std::vector<CelestialBody> &bodies) {
+  updateAccelerations(bodies);
+  std::vector<StateDerivative> d(bodies.size());
 
-    for (std::size_t i = 0; i < bodies.size(); ++i) {
-        d[i].dpos = bodies[i].velocity;
-        d[i].dvel = bodies[i].acceleration;
-    }
-    return d;
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    d[i].dpos = bodies[i].velocity;
+    d[i].dvel = bodies[i].acceleration;
+  }
+  return d;
 }
 
 /***********************
@@ -120,18 +124,17 @@ std::vector<StateDerivative> evaluateDerivatives(std::vector<CelestialBody>& bod
  * @param: scale  - scaling factor (e.g. dt/2, dt)
  * @return: new vector<CelestialBody> representing intermediate state
  ***********************/
-std::vector<CelestialBody> buildIntermediateState(
-    const std::vector<CelestialBody>& bodies,
-    const std::vector<StateDerivative>& d,
-    double scale) {
+std::vector<CelestialBody>
+buildIntermediateState(const std::vector<CelestialBody> &bodies,
+                       const std::vector<StateDerivative> &d, double scale) {
 
-    std::vector<CelestialBody> next = bodies;
+  std::vector<CelestialBody> next = bodies;
 
-    for (std::size_t i = 0; i < bodies.size(); ++i) {
-        next[i].position += scale * d[i].dpos;
-        next[i].velocity += scale * d[i].dvel;
-    }
-    return next;
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    next[i].position += scale * d[i].dpos;
+    next[i].velocity += scale * d[i].dvel;
+  }
+  return next;
 }
 
 /***********************
@@ -142,24 +145,27 @@ std::vector<CelestialBody> buildIntermediateState(
  * @exception: none
  * @return: none
  ***********************/
-void rk4Step(std::vector<CelestialBody>& bodies, double dt) {
-    if (bodies.empty()) return;
+void rk4Step(std::vector<CelestialBody> &bodies, double dt) {
+  if (bodies.empty())
+    return;
 
-    auto k1 = evaluateDerivatives(bodies);
-    auto s2 = buildIntermediateState(bodies, k1, dt * 0.5);
-    auto k2 = evaluateDerivatives(s2);
+  auto k1 = evaluateDerivatives(bodies);
+  auto s2 = buildIntermediateState(bodies, k1, dt * 0.5);
+  auto k2 = evaluateDerivatives(s2);
 
-    auto s3 = buildIntermediateState(bodies, k2, dt * 0.5);
-    auto k3 = evaluateDerivatives(s3);
+  auto s3 = buildIntermediateState(bodies, k2, dt * 0.5);
+  auto k3 = evaluateDerivatives(s3);
 
-    auto s4 = buildIntermediateState(bodies, k3, dt);
-    auto k4 = evaluateDerivatives(s4);
+  auto s4 = buildIntermediateState(bodies, k3, dt);
+  auto k4 = evaluateDerivatives(s4);
 
-    const double sixth = dt / 6.0;
-    for (std::size_t i = 0; i < bodies.size(); ++i) {
-        bodies[i].position += sixth * (k1[i].dpos + 2.0*k2[i].dpos + 2.0*k3[i].dpos + k4[i].dpos);
-        bodies[i].velocity += sixth * (k1[i].dvel + 2.0*k2[i].dvel + 2.0*k3[i].dvel + k4[i].dvel);
-    }
+  const double sixth = dt / 6.0;
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    bodies[i].position +=
+        sixth * (k1[i].dpos + 2.0 * k2[i].dpos + 2.0 * k3[i].dpos + k4[i].dpos);
+    bodies[i].velocity +=
+        sixth * (k1[i].dvel + 2.0 * k2[i].dvel + 2.0 * k3[i].dvel + k4[i].dvel);
+  }
 }
 
 /********************
@@ -171,20 +177,21 @@ void rk4Step(std::vector<CelestialBody>& bodies, double dt) {
  * @param idxMoon  - output index of Moon
  * @return true if all three bodies are found, false otherwise
  *********************/
-bool detectSEM(const std::vector<CelestialBody>& bodies,
-               int& idxSun, int& idxEarth, int& idxMoon)
-{
-    idxSun = idxEarth = idxMoon = -1;
+bool detectSEM(const std::vector<CelestialBody> &bodies, int &idxSun,
+               int &idxEarth, int &idxMoon) {
+  idxSun = idxEarth = idxMoon = -1;
 
-    for (int i = 0; i < (int)bodies.size(); i++) {
-        if (bodies[i].name == "Sun")   idxSun   = i;
-        if (bodies[i].name == "Earth") idxEarth = i;
-        if (bodies[i].name == "Moon")  idxMoon  = i;
-    }
+  for (int i = 0; i < (int)bodies.size(); i++) {
+    if (bodies[i].name == "Sun")
+      idxSun = i;
+    if (bodies[i].name == "Earth")
+      idxEarth = i;
+    if (bodies[i].name == "Moon")
+      idxMoon = i;
+  }
 
-    return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
+  return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
 }
-
 
 /********************
  * runSimulation
@@ -195,149 +202,130 @@ bool detectSEM(const std::vector<CelestialBody>& bodies,
  * @param outputPath - CSV output file path
  * @return none
  *********************/
-void runSimulation(std::vector<CelestialBody>& bodies,
-                   int steps,
-                   double dt,
-                   const std::string& outputPath)
-{
-    if (bodies.empty()) {
-        std::cerr << "❌ No bodies to simulate.\n";
-        return;
+void runSimulation(std::vector<CelestialBody> &bodies, int steps, double dt,
+                   const std::string &outputPath) {
+  if (bodies.empty()) {
+    std::cerr << "❌ No bodies to simulate.\n";
+    return;
+  }
+
+  // ============================
+  // Initial conservation checks
+  // ============================
+  physics::Conservations C0 = physics::compute(bodies);
+  double E0 = C0.total_energy;
+
+  double L0 =
+      std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
+
+  double P0mag =
+      std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
+
+  // ---------------------------------------------
+  // Optional eclipse logging for Sun–Earth–Moon
+  // ---------------------------------------------
+  int idxSun, idxEarth, idxMoon;
+  bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
+
+  std::ofstream eclipseFile;
+  if (isSEM) {
+    std::string eclipsePath = "build/eclipse_log.csv";
+    eclipseFile.open(eclipsePath);
+
+    if (!eclipseFile) {
+      std::cerr << "⚠️ Could not open eclipse log file: " << eclipsePath << "\n";
+      isSEM = false; // disable logging if file failed
+    } else {
+      eclipseFile << "step,"
+                  << "shadow_x,shadow_y,shadow_z,"
+                  << "umbraRadius,penumbraRadius,eclipseType\n";
+
+      std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
     }
+  }
 
-    // ============================
-    // Initial conservation checks
-    // ============================
-    physics::Conservations C0 = physics::compute(bodies);
-    double E0 = C0.total_energy;
+  // ============================
+  // Open main CSV file
+  // ============================
+  std::ofstream file(outputPath);
 
-    double L0 = std::sqrt(
-        C0.L[0]*C0.L[0] +
-        C0.L[1]*C0.L[1] +
-        C0.L[2]*C0.L[2]
-    );
+  if (!file) {
+    std::cerr << "❌ Could not open output file: " << outputPath << "\n";
+    return;
+  }
 
-    double P0mag = std::sqrt(
-        C0.P[0]*C0.P[0] +
-        C0.P[1]*C0.P[1] +
-        C0.P[2]*C0.P[2]
-    );
+  /**********************************************
+   * CSV HEADER (Generic for any N bodies)
+   **********************************************/
+  file << "step,";
+  for (const auto &b : bodies) {
+    file << "x_" << b.name << ","
+         << "y_" << b.name << ","
+         << "z_" << b.name << ",";
+  }
+
+  file << "E_total,KE,PE,"
+       << "Lx,Ly,Lz,Lmag,"
+       << "Px,Py,Pz,Pmag,"
+       << "dE_rel,dL_rel,dP_rel\n";
+
+  // ============================
+  // Main Integration Loop
+  // ============================
+  for (int i = 0; i < steps; ++i) {
+
+    // --- RK4 integration step ---
+    rk4Step(bodies, dt);
+
+    // --- Compute updated conservation values ---
+    physics::Conservations C = physics::compute(bodies);
+
+    double Lmag =
+        std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
+
+    double Pmag =
+        std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
+
+    double dE = (C.total_energy - E0) / std::abs(E0);
+    double dL = (Lmag - L0) / L0;
+    double dP = (Pmag - P0mag) / (P0mag == 0 ? 1.0 : P0mag);
 
     // ---------------------------------------------
-    // Optional eclipse logging for Sun–Earth–Moon
+    // Eclipse logging (Sun–Earth–Moon only)
     // ---------------------------------------------
-    int idxSun, idxEarth, idxMoon;
-    bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
-
-    std::ofstream eclipseFile;
     if (isSEM) {
-        std::string eclipsePath = "build/eclipse_log.csv";
-        eclipseFile.open(eclipsePath);
+      const vec3 &S = bodies[idxSun].position;
+      const vec3 &E = bodies[idxEarth].position;
+      const vec3 &M = bodies[idxMoon].position;
 
-        if (!eclipseFile) {
-            std::cerr << "⚠️ Could not open eclipse log file: " << eclipsePath << "\n";
-            isSEM = false; // disable logging if file failed
-        } else {
-            eclipseFile << "step,"
-                        << "shadow_x,shadow_y,shadow_z,"
-                        << "umbraRadius,penumbraRadius,eclipseType\n";
+      EclipseResult e = computeSolarEclipse(S, E, M);
 
-            std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
-        }
+      eclipseFile << i << "," << e.shadowCenter.x() << "," << e.shadowCenter.y()
+                  << "," << e.shadowCenter.z() << "," << e.umbraRadius << ","
+                  << e.penumbraRadius << "," << e.eclipseType << "\n";
     }
 
     // ============================
-    // Open main CSV file
+    // CSV ROW (main orbit data)
     // ============================
-    std::ofstream file(outputPath);
+    file << i << ",";
 
-    if (!file) {
-        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
-        return;
+    for (const auto &b : bodies) {
+      file << b.position.x() << "," << b.position.y() << "," << b.position.z()
+           << ",";
     }
 
-    /**********************************************
-     * CSV HEADER (Generic for any N bodies)
-     **********************************************/
-    file << "step,";
-    for (const auto& b : bodies) {
-        file << "x_" << b.name << ","
-             << "y_" << b.name << ","
-             << "z_" << b.name << ",";
-    }
+    file << C.total_energy << "," << C.kinetic_energy << ","
+         << C.potential_energy << "," << C.L[0] << "," << C.L[1] << ","
+         << C.L[2] << "," << Lmag << "," << C.P[0] << "," << C.P[1] << ","
+         << C.P[2] << "," << Pmag << "," << dE << "," << dL << "," << dP
+         << "\n";
+  }
 
-    file << "E_total,KE,PE,"
-         << "Lx,Ly,Lz,Lmag,"
-         << "Px,Py,Pz,Pmag,"
-         << "dE_rel,dL_rel,dP_rel\n";
+  file.close();
+  if (isSEM) {
+    eclipseFile.close();
+  }
 
-    // ============================
-    // Main Integration Loop
-    // ============================
-    for (int i = 0; i < steps; ++i) {
-
-        // --- RK4 integration step ---
-        rk4Step(bodies, dt);
-
-        // --- Compute updated conservation values ---
-        physics::Conservations C = physics::compute(bodies);
-
-        double Lmag = std::sqrt(C.L[0]*C.L[0] +
-                                C.L[1]*C.L[1] +
-                                C.L[2]*C.L[2]);
-
-        double Pmag = std::sqrt(C.P[0]*C.P[0] +
-                                C.P[1]*C.P[1] +
-                                C.P[2]*C.P[2]);
-
-        double dE = (C.total_energy - E0) / std::abs(E0);
-        double dL = (Lmag - L0) / L0;
-        double dP = (Pmag - P0mag) / (P0mag == 0 ? 1.0 : P0mag);
-
-        // ---------------------------------------------
-        // Eclipse logging (Sun–Earth–Moon only)
-        // ---------------------------------------------
-        if (isSEM) {
-            const vec3& S = bodies[idxSun].position;
-            const vec3& E = bodies[idxEarth].position;
-            const vec3& M = bodies[idxMoon].position;
-
-            EclipseResult e = computeSolarEclipse(S, E, M);
-
-            eclipseFile << i << ","
-                        << e.shadowCenter.x() << ","
-                        << e.shadowCenter.y() << ","
-                        << e.shadowCenter.z() << ","
-                        << e.umbraRadius << ","
-                        << e.penumbraRadius << ","
-                        << e.eclipseType << "\n";
-        }
-
-        // ============================
-        // CSV ROW (main orbit data)
-        // ============================
-        file << i << ",";
-
-        for (const auto& b : bodies) {
-            file << b.position.x() << ","
-                 << b.position.y() << ","
-                 << b.position.z() << ",";
-        }
-
-        file << C.total_energy << ","
-             << C.kinetic_energy << ","
-             << C.potential_energy << ","
-             << C.L[0] << "," << C.L[1] << "," << C.L[2] << ","
-             << Lmag << ","
-             << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
-             << Pmag << ","
-             << dE << "," << dL << "," << dP << "\n";
-    }
-
-    file.close();
-    if (isSEM) {
-        eclipseFile.close();
-    }
-
-    std::cout << "✅ Simulation complete: " << outputPath << "\n";
+  std::cout << "✅ Simulation complete: " << outputPath << "\n";
 }

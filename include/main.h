@@ -8,18 +8,18 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include "barycenter.h"
 #include "body.h"
+#include "cli.h"
+#include "horizons.h"
+#include "json_loader.h"
+#include "ray.h"
 #include "simulation.h"
 #include "utils.h"
-#include "ray.h"
-#include "vec3.h"
-#include "cli.h"
-#include "json_loader.h"
-#include "horizons.h"
 #include "validate.h"
-#include "barycenter.h"
+#include "vec3.h"
+#include <filesystem>
 #include <iostream>
 #include <string>
-#include <filesystem>
 
-#endif //MAIN_H
+#endif // MAIN_H

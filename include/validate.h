@@ -8,8 +8,8 @@
 #ifndef ORBIT_SIM_VALIDATE_H
 #define ORBIT_SIM_VALIDATE_H
 
-#include "json_loader.h"
 #include "body.h"
+#include "json_loader.h"
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -21,6 +21,6 @@
  * @param path Path to JSON file
  * @return true if valid, false if invalid
  */
-bool validateSystemFile(const std::string& path);
+bool validateSystemFile(const std::string &path);
 
 #endif
