@@ -344,7 +344,7 @@ When reporting bugs, include:
 **Actual**: Segmentation fault after 500 steps
 **Error**: `Segmentation fault (core dumped)`
 **Minimal**: Attached minimal JSON configuration
-```
+
 
 ## 💡 Feature Requests
 
