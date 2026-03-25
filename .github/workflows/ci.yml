@@ -16,26 +16,28 @@ jobs:
 
       - name: Install clang-format 21
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 21
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-21 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
           sudo apt-get install -y clang-format-21
 
-      - name: Check changed files formatting
+      - name: Check formatting
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base=origin/main
-          else
-            base=HEAD~1
+          git fetch origin main
+
+          base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)
+
+          files=$(git diff --name-only "$base" | grep -E '\.(cpp|h)$' | grep -v '/external/' | grep -v '/build/')
+
+          if [ -z "$files" ]; then
+            echo "No C++ source files changed."
+            exit 0
           fi
 
-          files=$(git diff --name-only $base | grep -E '\.(cpp|h)$' | grep -v '^external/' | grep -v '/build/')
-
-          if [ -n "$files" ]; then
-            echo "$files" | xargs clang-format --dry-run --Werror
-          fi
-
-          echo "Code is properly formatted."
+          echo "Checking files:"
+          echo "$files"
+          echo ""
+          echo "$files" | xargs clang-format-21 --dry-run --Werror
 
   build:
     needs: lint
