@@ -7,55 +7,63 @@ on:
     branches: [ main, master ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check changed files formatting
+        run: |
+          git clang-format --diff HEAD~1 > format.patch
+          if [ -s format.patch ]; then
+            echo "Formatting violations found:"
+            cat format.patch
+            exit 1
+          fi
+          echo "Code is properly formatted."
+
   build:
+    needs: lint
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # --------------------------------
-    # Install system dependencies
-    # --------------------------------
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libcurl4-openssl-dev
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
-    - name: Set up CMake
-      uses: lukka/get-cmake@latest
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
 
-    # --------------------------------
-    # Configure Debug (viewer disabled)
-    # --------------------------------
-    - name: Configure (Debug)
-      run: |
-        cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_VIEWER=OFF
+      - name: Build
+        run: make -j
 
-    # --------------------------------
-    # Build core + CLI only
-    # --------------------------------
-    - name: Build (Debug)
-      run: |
-        cmake --build build-debug --target orbit_core orbit-sim --parallel
+      - name: Verify CLI
+        run: ./build/bin/orbit-sim --help
 
-    # --------------------------------
-    # Smoke test
-    # --------------------------------
-    - name: Run basic simulation
-      run: |
-        ./build-debug/bin/orbit-sim --help
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
 
-    # --------------------------------
-    # Configure Release
-    # --------------------------------
-    - name: Configure (Release)
-      run: |
-        cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_VIEWER=OFF
+    steps:
+      - uses: actions/checkout@v4
 
-    # --------------------------------
-    # Build Release
-    # --------------------------------
-    - name: Build (Release)
-      run: |
-        cmake --build build-release --target orbit_core orbit-sim --parallel
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Build
+        run: make -j
+
+      - name: Validate system file
+        run: make validate
+
+      - name: Run test simulation
+        run: make test
