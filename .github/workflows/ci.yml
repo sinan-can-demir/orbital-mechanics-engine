@@ -14,22 +14,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install clang-format 21
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 21
-          sudo apt-get install -y clang-format-21
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
 
-      - name: Check changed files formatting
+      - name: Check formatting
         run: |
           git fetch origin main
-          CHANGED_FILES=$(git diff --name-only origin/main | grep -E '\.(cpp|h)$' | grep -v '^external/' | grep -v '/build/')
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No C++ files changed."
+
+          # Determine base commit
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base=origin/main
+          else
+            base=$(git rev-parse HEAD~1 2>/dev/null || echo HEAD)
+          fi
+
+          # Get changed C++ files safely
+          files=$(git diff --name-only "$base" \
+            | grep -E '\.(cpp|h)$' \
+            | grep -v '^external/' \
+            | grep -v '^build/' || true)
+
+          if [ -z "$files" ]; then
+            echo "No C++ source files changed."
             exit 0
           fi
-          echo "$CHANGED_FILES" | xargs clang-format-21 --dry-run --Werror
+
+          echo "Checking files:"
+          echo "$files"
+          echo ""
+
+          # Safe iteration over files
+          while IFS= read -r file; do
+            clang-format --dry-run --Werror "$file"
+          done <<< "$files"
 
   build:
     needs: lint
