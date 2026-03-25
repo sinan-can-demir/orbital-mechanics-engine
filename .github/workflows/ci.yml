@@ -41,11 +41,11 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Set up CMake
-        uses: lukka/get-cmake@latest
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_VIEWER=OFF
 
       - name: Build
-        run: make -j
+        run: cmake --build build --parallel
 
       - name: Verify CLI
         run: ./build/bin/orbit-sim --help
@@ -60,14 +60,14 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Set up CMake
-        uses: lukka/get-cmake@latest
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_VIEWER=OFF
 
       - name: Build
-        run: make -j
+        run: cmake --build build --parallel
 
       - name: Validate system file
-        run: make validate
+        run: ./build/bin/orbit-sim validate --system systems/earth_moon.json
 
       - name: Run test simulation
-        run: make test
+        run: ./build/bin/orbit-sim run --system systems/earth_moon.json --steps 100 --dt 3600 --output results/test_out.csv
