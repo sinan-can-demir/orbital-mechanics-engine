@@ -19,7 +19,8 @@ jobs:
 
       - name: Check changed files formatting
         run: |
-          git clang-format --diff HEAD~1 > format.patch
+          git fetch origin main
+          git clang-format origin/main > format.patch
           if [ -s format.patch ]; then
             echo "Formatting violations found:"
             cat format.patch
