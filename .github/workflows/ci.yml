@@ -20,20 +20,33 @@ jobs:
       - name: Check formatting
         run: |
           git fetch origin main
-
-          base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)
-
-          files=$(git diff --name-only "$base" | grep -E '\.(cpp|h)$' | grep -v '/external/' | grep -v '/build/')
-
+              
+          # Determine base commit
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base=origin/main
+          else
+            base=HEAD~1
+          fi
+              
+          # Get changed C++ files
+          files=$(git diff --name-only "$base" \
+            | grep -E '\.(cpp|h)$' \
+            | grep -v '^external/' \
+            | grep -v '^build/' || true)
+              
           if [ -z "$files" ]; then
             echo "No C++ source files changed."
             exit 0
           fi
-
+              
           echo "Checking files:"
           echo "$files"
           echo ""
-          echo "$files" | xargs clang-format --dry-run --Werror
+              
+          # Run formatter check safely
+          for file in $files; do
+            clang-format --dry-run --Werror "$file"
+          done
 
   build:
     needs: lint
