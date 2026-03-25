@@ -7,55 +7,67 @@ on:
     branches: [ main, master ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format 21
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 21
+          sudo apt-get install -y clang-format-21
+
+      - name: Check changed files formatting
+        run: |
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main | grep -E '\.(cpp|h)$' | grep -v '^external/' | grep -v '/build/')
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No C++ files changed."
+            exit 0
+          fi
+          echo "$CHANGED_FILES" | xargs clang-format-21 --dry-run --Werror
+
   build:
+    needs: lint
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # --------------------------------
-    # Install system dependencies
-    # --------------------------------
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libcurl4-openssl-dev
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
-    - name: Set up CMake
-      uses: lukka/get-cmake@latest
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_VIEWER=OFF
 
-    # --------------------------------
-    # Configure Debug (viewer disabled)
-    # --------------------------------
-    - name: Configure (Debug)
-      run: |
-        cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_VIEWER=OFF
+      - name: Build
+        run: cmake --build build --parallel
 
-    # --------------------------------
-    # Build core + CLI only
-    # --------------------------------
-    - name: Build (Debug)
-      run: |
-        cmake --build build-debug --target orbit_core orbit-sim --parallel
+      - name: Verify CLI
+        run: ./build/bin/orbit-sim --help
 
-    # --------------------------------
-    # Smoke test
-    # --------------------------------
-    - name: Run basic simulation
-      run: |
-        ./build-debug/bin/orbit-sim --help
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
 
-    # --------------------------------
-    # Configure Release
-    # --------------------------------
-    - name: Configure (Release)
-      run: |
-        cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_VIEWER=OFF
+    steps:
+      - uses: actions/checkout@v4
 
-    # --------------------------------
-    # Build Release
-    # --------------------------------
-    - name: Build (Release)
-      run: |
-        cmake --build build-release --target orbit_core orbit-sim --parallel
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_VIEWER=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Validate system file
+        run: ./build/bin/orbit-sim validate --system systems/earth_moon.json
+
+      - name: Run test simulation
+        run: ./build/bin/orbit-sim run --system systems/earth_moon.json --steps 100 --dt 3600 --output results/test_out.csv

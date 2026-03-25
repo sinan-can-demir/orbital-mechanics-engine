@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Option to enable / disable viewer (ON locally, OFF in CI)
-option(BUILD_VIEWER "Build OpenGL viewer" ON)
+option(BUILD_VIEWER "Build OpenGL viewer (requires OpenGL, GLFW, GLM)" ON)
 
 # Put all executables in build/bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -23,9 +23,14 @@ find_package(CURL REQUIRED)
 
 # Viewer-only dependencies (only searched if viewer enabled)
 if (BUILD_VIEWER)
-    find_package(OpenGL REQUIRED)
-    find_package(glfw3 REQUIRED)
-    find_package(glm REQUIRED)       # for matrices & vectors
+    find_package(OpenGL)
+    find_package(glfw3)
+    find_package(glm)
+
+    if (NOT OpenGL_FOUND OR NOT GLFW3_FOUND OR NOT GLM_FOUND)
+        message(WARNING "OpenGL, GLFW3, or GLM not found. Disabling viewer.")
+        set(BUILD_VIEWER OFF CACHE BOOL "Build OpenGL viewer" FORCE)
+    endif()
 endif()
 
 # ------------------------------------------------------------
