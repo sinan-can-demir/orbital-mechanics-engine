@@ -14,12 +14,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install clang-format 21
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-21 main" | sudo tee /etc/apt/sources.list.d/llvm.list
-          sudo apt-get update
-          sudo apt-get install -y clang-format-21
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
 
       - name: Check formatting
         run: |
@@ -37,7 +33,7 @@ jobs:
           echo "Checking files:"
           echo "$files"
           echo ""
-          echo "$files" | xargs clang-format-21 --dry-run --Werror
+          echo "$files" | xargs clang-format --dry-run --Werror
 
   build:
     needs: lint
