@@ -30,3 +30,5 @@
 !.github/
 !.github/**
 !CMakeLists.txt
+!Makefile
+!.clang-format
