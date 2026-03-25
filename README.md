@@ -96,6 +96,9 @@ orbital-mechanics-engine/
 ├── shaders/               # GLSL shaders
 ├── docs/                  # Technical documentation
 ├── plotting_scripts/      # Python analysis tools
+├── Makefile              # Build orchestration
+├── .github/
+│   └── workflows/ci.yml  # CI pipeline
 ├── orbital_mechanics_engine_cli_reference.md  # CLI commands
 └── README.md
 ```
@@ -107,18 +110,73 @@ orbital-mechanics-engine/
 ### Requirements
 - C++17 compiler
 - CMake ≥ 3.14
-- OpenGL 3.3
+- OpenGL 3.3 (optional, for viewer)
 - GLAD
 - GLFW3
 - GLM (OpenGL Mathematics)
 - libcurl
 - Python 3 (optional, for plotting)
 
-### Build Steps
+### Quick Start with Makefile
 
 ```bash
 git clone https://github.com/eisensenpou/orbital-mechanics-engine.git
 cd orbital-mechanics-engine
+make
+```
+
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Build all executables |
+| `make build-sim` | Build CLI only |
+| `make build-viewer` | Build viewer only |
+| `make clean` | Remove build directory |
+| `make reconfigure` | Clean and reconfigure CMake |
+
+**Simulation:**
+| Target | Description |
+|--------|-------------|
+| `make run` | Run default simulation |
+| `make run-earth-moon` | Run Earth-Moon simulation |
+| `make run-solar-system` | Run full Solar System (100k steps) |
+
+**Viewer:**
+| Target | Description |
+|--------|-------------|
+| `make view` | Launch viewer with default output |
+| `make view-last` | Launch viewer with Earth-Moon results |
+
+**Utilities:**
+| Target | Description |
+|--------|-------------|
+| `make validate` | Validate system file |
+| `make test` | Quick validation test |
+| `make fetch` | Fetch HORIZONS ephemeris |
+
+**Python Plotting:**
+| Target | Description |
+|--------|-------------|
+| `make plot` | Generate all plots |
+| `make plot-energy` | Energy conservation plot |
+| `make plot-momentum` | Angular momentum plot |
+| `make plot-3d` | 3D orbit visualization |
+| `make plot-3d-exaggerated` | 3D with exaggerated scale |
+
+### Configuration Options
+
+```bash
+# Build without OpenGL viewer (headless/CI)
+make BUILD_VIEWER=0 build
+
+# Pass custom CMake flags
+make CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug" build
+```
+
+### Manual Build Steps
+
+```bash
 mkdir build && cd build
 cmake ..
 make -j
@@ -126,8 +184,8 @@ make -j
 
 Executables appear in `build/bin/`:
 
-- `orbit-sim` — main simulation engine  
-- `orbit-viewer` — real‑time 3D visualization  
+- `orbit-sim` — main simulation engine
+- `orbit-viewer` — real‑time 3D visualization
 
 ---
 
@@ -274,6 +332,19 @@ The simulation employs a fourth-order Runge-Kutta (RK4) integrator for state pro
 - Limited to modest N-body counts (performance considerations)
 - No collision detection or handling
 - Simplified eclipse geometry (no atmospheric effects)
+
+---
+
+## 🔄 Continuous Integration
+
+The project uses GitHub Actions for CI on every push and pull request.
+
+**CI Pipeline:**
+1. **Lint** — Code formatting check (clang-format on changed files)
+2. **Build** — Compile release binary
+3. **Test** — Validate system files and run test simulations
+
+**Workflow:** `.github/workflows/ci.yml`
 
 ---
 
