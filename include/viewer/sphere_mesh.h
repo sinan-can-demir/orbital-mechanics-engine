@@ -5,20 +5,21 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-class SphereMesh {
-public:
-  SphereMesh();
-  ~SphereMesh();
+class SphereMesh
+{
+  public:
+    SphereMesh();
+    ~SphereMesh();
 
-  void build(float radius, int segments, int rings);
+    void build(float radius, int segments, int rings);
 
-  void draw() const;
+    void draw() const;
 
-private:
-  GLuint vao = 0;
-  GLuint vbo = 0;
-  GLuint ebo = 0;
-  GLsizei indexCount = 0;
+  private:
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint ebo = 0;
+    GLsizei indexCount = 0;
 };
 
 #endif // SPHERE_MESH_H

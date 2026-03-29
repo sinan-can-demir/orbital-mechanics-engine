@@ -9,8 +9,10 @@
 
 #include <cmath>
 
-namespace physics {
-namespace constants {
+namespace physics
+{
+namespace constants
+{
 
 // ==============================
 // Fundamental constants
@@ -36,7 +38,7 @@ constexpr double R_MOON = 1.737e6;  // m
 // Orbital
 // ==============================
 constexpr double MOON_INCLINATION = 5.145 * (M_PI / 180.0); // radians
-constexpr double AU = 1.495978707e11; // astronomical unit (m)
+constexpr double AU = 1.495978707e11;                       // astronomical unit (m)
 
 // ==============================
 // Orbital distances

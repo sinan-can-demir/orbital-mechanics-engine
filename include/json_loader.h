@@ -12,6 +12,6 @@
 #include <string>
 #include <vector>
 
-std::vector<CelestialBody> loadSystemFromJSON(const std::string &path);
+std::vector<CelestialBody> loadSystemFromJSON(const std::string& path);
 
 #endif // ORBIT_SIM_JSON_LOADER_H

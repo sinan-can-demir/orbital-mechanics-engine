@@ -36,6 +36,7 @@ NC               := \033[0m
 .PHONY: all build build-sim build-viewer clean reconfigure help
 .PHONY: run run-earth-moon run-solar-system view fetch validate validate-earth-moon test
 .PHONY: plot plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
+.PHONY: format format-check
 
 # Default target
 all: build
@@ -134,6 +135,10 @@ test: validate-earth-moon
 		--output $(RESULTS_DIR)/test_out.csv
 	@echo "$(GREEN)Test complete. Output: $(RESULTS_DIR)/test_out.csv$(NC)"
 
+test-conservation: $(SIM_EXE)
+	@echo "$(BLUE)Running conservation test...$(NC)"
+	@./build/bin/test_conservation
+
 # ========================================
 # PYTHON PLOTTING TARGETS
 # ========================================
@@ -160,6 +165,23 @@ plot-3d-exaggerated:
 plot-3d-earth-moon:
 	@echo "$(BLUE)Generating Earth-Moon 3D plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dplot_earth_moon.py
+
+# ========================================
+# FORMATTING TARGETS
+# ========================================
+
+FORMAT_FILES := $(shell find src include tests \( -name '*.cpp' -o -name '*.h' \))
+CLANG_FORMAT ?= clang-format
+
+format:
+	@echo "$(BLUE)Formatting code with clang-format...$(NC)"
+	@clang-format -i $(FORMAT_FILES)
+	@echo "$(GREEN)Formatting complete.$(NC)"
+
+format-check:
+	@echo "$(BLUE)Checking formatting (CI mode)...$(NC)"
+	@clang-format --dry-run --Werror $(FORMAT_FILES)
+
 
 # ========================================
 # HELP
@@ -191,6 +213,7 @@ help:
 	@echo "    make validate           - Validate default system file"
 	@echo "    make validate-earth-moon - Validate Earth-Moon system file"
 	@echo "    make test               - Quick validation test"
+	@echo "	   make test-conservation  - Run conservation test"
 	@echo ""
 	@echo "  Python Plotting Targets:"
 	@echo "    make plot               - Generate all plots"
@@ -199,6 +222,9 @@ help:
 	@echo "    make plot-3d            - 3D orbit visualization"
 	@echo "    make plot-3d-exaggerated - 3D with exaggerated scale"
 	@echo "    make plot-3d-earth-moon - Earth-Moon 3D plot"
+	@echo ""
+	@echo "    make format             - Auto-format all source files"
+	@echo "    make format-check       - Check formatting (CI style)"
 	@echo ""
 	@echo "  Configuration Options:"
 	@echo "    BUILD_VIEWER=0          - Build without OpenGL viewer (CI/headless)"

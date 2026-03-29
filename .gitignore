@@ -23,6 +23,8 @@
 !external/**
 !shaders
 !shaders/**
+!tests/
+!tests/**
 !plotting_scripts
 !plotting_scripts/**/
 !docs

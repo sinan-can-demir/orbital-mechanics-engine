@@ -27,11 +27,12 @@
  * struct EclipseResult
  * Purpose: Stores solar eclipse shadow geometry for Earth.
  *****************/
-struct EclipseResult {
-  vec3 shadowCenter;     // shadow center on Earth's surface
-  double umbraRadius;    // umbra radius at Earth (m)
-  double penumbraRadius; // penumbra radius at Earth (m)
-  int eclipseType;       // 0 = none, 1 = total, 2 = annular, 3 = partial
+struct EclipseResult
+{
+    vec3 shadowCenter;     // shadow center on Earth's surface
+    double umbraRadius;    // umbra radius at Earth (m)
+    double penumbraRadius; // penumbra radius at Earth (m)
+    int eclipseType;       // 0 = none, 1 = total, 2 = annular, 3 = partial
 };
 
 /****************
@@ -45,6 +46,6 @@ struct EclipseResult {
  * @note: Uses analytic cone geometry; eclipseType encodes:
  *        0 = no eclipse, 1 = total, 2 = annular, 3 = partial.
  *****************/
-EclipseResult computeSolarEclipse(const vec3 &S, const vec3 &E, const vec3 &M);
+EclipseResult computeSolarEclipse(const vec3& S, const vec3& E, const vec3& M);
 
 #endif // ECLIPSE_H
