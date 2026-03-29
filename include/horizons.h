@@ -21,12 +21,13 @@
  *  - center : Reference center (e.g. "0" for Solar System barycenter).
  *  - start_time, stop_time, step_size: Ephemeris time span and step.
  *********************/
-struct HorizonsFetchOptions {
-  std::string command;    ///< Target body (NAIF ID or name string)
-  std::string center;     ///< Center body (NAIF ID or named, e.g. "0")
-  std::string start_time; ///< Start time, e.g. "2025-01-01"
-  std::string stop_time;  ///< Stop time, e.g. "2025-01-02"
-  std::string step_size;  ///< e.g. "1 d", "1 h"
+struct HorizonsFetchOptions
+{
+    std::string command;    ///< Target body (NAIF ID or name string)
+    std::string center;     ///< Center body (NAIF ID or named, e.g. "0")
+    std::string start_time; ///< Start time, e.g. "2025-01-01"
+    std::string stop_time;  ///< Stop time, e.g. "2025-01-02"
+    std::string step_size;  ///< e.g. "1 d", "1 h"
 };
 
 /********************
@@ -38,9 +39,9 @@ struct HorizonsFetchOptions {
  * @param verbose    - Enable verbose output
  * @return true on success, false on failure
  *********************/
-bool fetchHorizonsEphemeris(const HorizonsFetchOptions &opts,
-                            const std::string &outputPath, bool verbose);
-bool fetchHorizonsEphemerisPOST(const HorizonsFetchOptions &opts,
-                                const std::string &outputPath, bool verbose);
+bool fetchHorizonsEphemeris(const HorizonsFetchOptions& opts, const std::string& outputPath,
+                            bool verbose);
+bool fetchHorizonsEphemerisPOST(const HorizonsFetchOptions& opts, const std::string& outputPath,
+                                bool verbose);
 
 #endif // ORBIT_SIM_HORIZONS_H

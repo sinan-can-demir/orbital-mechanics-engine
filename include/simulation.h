@@ -19,10 +19,10 @@
 #include <vector>
 
 // void computeAcceleration(CelestialBody& earth, const CelestialBody& sun);
-void computeGravitationalForce(CelestialBody &a, CelestialBody &b);
-void eulerStep(CelestialBody &body, double dt);
-void rk4Step(std::vector<CelestialBody> &bodies, double dt);
-void runSimulation(std::vector<CelestialBody> &bodies, int steps, double dt,
-                   const std::string &outputPath);
+void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
+void eulerStep(CelestialBody& body, double dt);
+void rk4Step(std::vector<CelestialBody>& bodies, double dt);
+void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
+                   const std::string& outputPath);
 
 #endif // SIMULATION_H

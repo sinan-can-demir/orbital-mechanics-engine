@@ -170,7 +170,7 @@ plot-3d-earth-moon:
 # FORMATTING TARGETS
 # ========================================
 
-FORMAT_FILES := $(shell git ls-files '*.cpp' '*.h')
+FORMAT_FILES := $(shell git ls-files '*.cpp' '*.h' | grep -v '^external/')
 
 format:
 	@echo "$(BLUE)Formatting code with clang-format...$(NC)"

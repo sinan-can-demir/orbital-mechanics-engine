@@ -15,21 +15,23 @@
 #include <string>
 #include <vector>
 
-struct Frame {
-  glm::vec3 sun;
-  glm::vec3 earth;
-  glm::vec3 moon;
+struct Frame
+{
+    glm::vec3 sun;
+    glm::vec3 earth;
+    glm::vec3 moon;
 };
 
-class CSVLoader {
-public:
-  CSVLoader() = default;
+class CSVLoader
+{
+  public:
+    CSVLoader() = default;
 
-  // Load from file path
-  std::vector<Frame> loadOrbitCSV(const std::string &path);
+    // Load from file path
+    std::vector<Frame> loadOrbitCSV(const std::string& path);
 
-private:
-  float scaleMeters = 1.0f / 5e9f; // 1 GL unit = 5,000,000 km
+  private:
+    float scaleMeters = 1.0f / 5e9f; // 1 GL unit = 5,000,000 km
 };
 
 #endif // CSV_LOADER_H

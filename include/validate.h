@@ -21,6 +21,6 @@
  * @param path Path to JSON file
  * @return true if valid, false if invalid
  */
-bool validateSystemFile(const std::string &path);
+bool validateSystemFile(const std::string& path);
 
 #endif
