@@ -36,6 +36,7 @@ NC               := \033[0m
 .PHONY: all build build-sim build-viewer clean reconfigure help
 .PHONY: run run-earth-moon run-solar-system view fetch validate validate-earth-moon test
 .PHONY: plot plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
+.PHONY: format format-check
 
 # Default target
 all: build
@@ -166,6 +167,22 @@ plot-3d-earth-moon:
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dplot_earth_moon.py
 
 # ========================================
+# FORMATTING TARGETS
+# ========================================
+
+FORMAT_FILES := $(shell git ls-files '*.cpp' '*.h')
+
+format:
+	@echo "$(BLUE)Formatting code with clang-format...$(NC)"
+	@clang-format -i $(FORMAT_FILES)
+	@echo "$(GREEN)Formatting complete.$(NC)"
+
+format-check:
+	@echo "$(BLUE)Checking formatting (CI mode)...$(NC)"
+	@clang-format --dry-run --Werror $(FORMAT_FILES)
+
+
+# ========================================
 # HELP
 # ========================================
 
@@ -204,6 +221,9 @@ help:
 	@echo "    make plot-3d            - 3D orbit visualization"
 	@echo "    make plot-3d-exaggerated - 3D with exaggerated scale"
 	@echo "    make plot-3d-earth-moon - Earth-Moon 3D plot"
+	@echo ""
+	@echo "    make format             - Auto-format all source files"
+	@echo "    make format-check       - Check formatting (CI style)"
 	@echo ""
 	@echo "  Configuration Options:"
 	@echo "    BUILD_VIEWER=0          - Build without OpenGL viewer (CI/headless)"
