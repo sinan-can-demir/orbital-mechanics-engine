@@ -80,26 +80,51 @@ orbital-mechanics-engine/
 │   ├── barycenter.h
 │   ├── eclipse.h
 │   ├── conservations.h
+│   ├── nlohmann/            # JSON library
 │   └── viewer/
 │       ├── csv_loader.h
 │       └── sphere_mesh.h
 │
 ├── src/
-│   ├── core/               # Physics engine
-│   ├── io/                 # JSON + HORIZONS
-│   ├── cli/                # Command-line interface
-│   ├── viewer/             # OpenGL renderer
-│   └── …
+│   ├── core/                # Physics engine (simulation, conservations, eclipse)
+│   ├── io/                  # JSON loading + HORIZONS integration
+│   ├── cli/                 # Command-line interface
+│   └── viewer/              # OpenGL renderer
 │
-├── external/glad          # glad library
-├── systems/               # JSON orbital systems
-├── shaders/               # GLSL shaders
-├── docs/                  # Technical documentation
-├── plotting_scripts/      # Python analysis tools
-├── Makefile              # Build orchestration
+├── python/                  # Python visualization tools
+│   ├── 3Dplot.py
+│   ├── 3Dplot_earth_moon.py
+│   ├── 3Dexaggerated_plot.py
+│   ├── 3Draytracing.py
+│   ├── angular_momentum_plot.py
+│   └── energy_conservation.py
+│
+├── systems/                 # JSON orbital system definitions
+│   ├── earth_moon.json
+│   └── solar_system.json
+│
+├── docs/                    # Technical documentation
+│   ├── architecture.md
+│   ├── design-notes.md
+│   ├── physics-and-methods.md
+│   ├── validation.md
+│   ├── ROADMAP.md
+│   ├── orbital_mechanics_engine_cli_reference.md
+│   └── debug/
+│       └── debug_list.md
+│
+├── tests/                   # Test files
+├── examples/                # Example scripts
+│
+├── Makefile                 # Build orchestration
+├── CMakeLists.txt
+├── viewer_config.json
+│
 ├── .github/
-│   └── workflows/ci.yml  # CI pipeline
-├── orbital_mechanics_engine_cli_reference.md  # CLI commands
+│   └── workflows/
+│       └── ci.yml           # CI pipeline
+│
+├── CONTRIBUTING.md
 └── README.md
 ```
 
@@ -245,18 +270,19 @@ Uses real planetary radii and optional distance‑compression scaling for visibi
 
 ## 📊 Python Visualization Tools
 
-From `plotting_scripts/`:
+From `python/`:
 
 ```bash
-python3 plot_orbits.py ../results/out.csv
-python3 animate_orbits.py
+python3 python/3Dplot.py ../results/out.csv
+python3 python/3Draytracing.py
 ```
 
 Includes:
-- 2D orbit plots
-- 3D matplotlib playback
-- Animated GIF/MP4 generation
-- Energy/momentum drift graphs
+- 3D orbit plots with matplotlib
+- 3D raytracing visualization
+- Angular momentum plotting
+- Energy conservation analysis
+- Exaggerated scale 3D views
 
 ---
 
