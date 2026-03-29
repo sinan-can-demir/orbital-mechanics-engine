@@ -26,9 +26,6 @@ jobs:
           sudo apt-get install -y clang-format-21
           sudo ln -sf /usr/bin/clang-format-21 /usr/bin/clang-format
 
-      - name: Set clang-format
-        run: sudo ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format
-
       - name: Check formatting
         run: |
           git fetch origin main
