@@ -120,3 +120,12 @@ target_link_libraries(orbit-sim PRIVATE
     orbit_core
     CURL::libcurl
 )
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+add_executable(test_conservation tests/test_conservation.cpp)
+
+target_link_libraries(test_conservation PRIVATE orbit_core)
+
+target_include_directories(test_conservation PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)

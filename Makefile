@@ -134,6 +134,10 @@ test: validate-earth-moon
 		--output $(RESULTS_DIR)/test_out.csv
 	@echo "$(GREEN)Test complete. Output: $(RESULTS_DIR)/test_out.csv$(NC)"
 
+test-conservation: $(SIM_EXE)
+	@echo "$(BLUE)Running conservation test...$(NC)"
+	@./build/bin/test_conservation
+
 # ========================================
 # PYTHON PLOTTING TARGETS
 # ========================================
@@ -191,6 +195,7 @@ help:
 	@echo "    make validate           - Validate default system file"
 	@echo "    make validate-earth-moon - Validate Earth-Moon system file"
 	@echo "    make test               - Quick validation test"
+	@echo "	   make test-conservation  - Run conservation test"
 	@echo ""
 	@echo "  Python Plotting Targets:"
 	@echo "    make plot               - Generate all plots"
