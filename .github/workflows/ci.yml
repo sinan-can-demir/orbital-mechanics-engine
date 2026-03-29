@@ -15,7 +15,10 @@ jobs:
           fetch-depth: 0
 
       - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-21
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+
+      - name: Set clang-format
+        run: sudo ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format
 
       - name: Check formatting
         run: |
