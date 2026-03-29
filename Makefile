@@ -12,7 +12,7 @@ CMAKE_CONFIG     := $(CMAKE) .. $(CMAKE_FLAGS) -DBUILD_VIEWER=$(BUILD_VIEWER)
 PROJECT_ROOT     := $(shell cd $(BUILD_DIR)/.. && pwd)
 SYSTEMS_DIR      := $(PROJECT_ROOT)/systems
 RESULTS_DIR      := $(PROJECT_ROOT)/results
-SCRIPTS_DIR      := $(PROJECT_ROOT)/plotting_scripts
+SCRIPTS_DIR      := $(PROJECT_ROOT)/python
 
 # Executables
 SIM_EXE          := $(BUILD_DIR)/bin/orbit-sim
