@@ -5,7 +5,8 @@
 #include <cmath>
 #include <cassert>
 
-int main() {
+int main()
+{
     // Load the Earth-Moon system
     auto bodies = loadSystemFromJSON("systems/earth_moon.json");
 
@@ -16,10 +17,11 @@ int main() {
     std::cout << "Initial energy: " << E0 << "\n";
 
     // Run 10,000 steps at dt=60s (real Moon orbit needs fine steps)
-    const int    STEPS = 10000;
-    const double DT    = 60.0;
+    const int STEPS = 10000;
+    const double DT = 60.0;
 
-    for (int i = 0; i < STEPS; ++i) {
+    for (int i = 0; i < STEPS; ++i)
+    {
         rk4Step(bodies, DT);
     }
 
@@ -33,7 +35,8 @@ int main() {
     std::cout << "Relative drift: " << drift << "\n";
 
     // Assert drift stays below 1e-5 (0.001%)
-    if (drift > 1e-5) {
+    if (drift > 1e-5)
+    {
         std::cerr << "FAIL: energy drift " << drift << " exceeds 1e-5\n";
         return 1;
     }
