@@ -103,7 +103,7 @@ view: $(VIEWER_EXE)
 	@$(VIEWER_EXE) $(DEFAULT_OUTPUT)
 
 view-last: $(VIEWER_EXE)
-	@$(VIEWER_EXE) $(RESULTS_DIR)/earth_moon_out.csv
+	@$(VIEWER_EXE) $(RESULTS_DIR)/solar_system_out.csv
 
 fetch:
 	@$(SIM_EXE) fetch \
