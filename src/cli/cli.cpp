@@ -45,7 +45,7 @@ CLIOptions parseCLI(int argc, char** argv)
     }
 
     // ----------------------------------------------
-    // 2. Normal command (run, list, info, validate, fetch…)
+    // 2. Normal command (run, list, info, validate, fetch, build-system…)
     // ----------------------------------------------
     opt.command = cmd;
 
@@ -55,6 +55,13 @@ CLIOptions parseCLI(int argc, char** argv)
     for (int i = 2; i < argc; ++i)
     {
         std::string a = argv[i];
+
+        if (a == "--help" || a == "-h")
+        {
+            opt.command = "help";
+            opt.systemFile = cmd;
+            return opt;
+        }
 
         // ----- Simulation Options -----
         if (a == "--system" && i + 1 < argc)
@@ -87,9 +94,24 @@ CLIOptions parseCLI(int argc, char** argv)
         {
             opt.fetchBody = argv[++i];
         }
+        else if (a == "--bodies" && i + 1 < argc)
+        {
+            opt.buildBodies = argv[++i];
+        }
+        else if (a == "--epoch" && i + 1 < argc)
+        {
+            opt.buildEpoch = argv[++i];
+        }
         else if (a == "--center" && i + 1 < argc)
         {
-            opt.fetchCenter = argv[++i];
+            if (opt.command == "build-system")
+            {
+                opt.buildCenter = argv[++i];
+            }
+            else
+            {
+                opt.fetchCenter = argv[++i];
+            }
         }
         else if (a == "--start" && i + 1 < argc)
         {
@@ -111,9 +133,25 @@ CLIOptions parseCLI(int argc, char** argv)
         {
             opt.usePost = true;
         }
+        else if (a == "--get")
+        {
+            opt.usePost = false;
+        }
         else if (a == "--normalize")
         {
             opt.normalize = true;
+        }
+        else if (a == "--run")
+        {
+            if (opt.command == "build-system")
+            {
+                opt.buildRun = true;
+            }
+            else
+            {
+                std::cerr << "Unknown option: " << a << "\n";
+                exit(1);
+            }
         }
         // ----- Unknown Option -----
         else
@@ -139,6 +177,7 @@ void printGlobalHelp()
               << "  run      --system FILE --steps N --dt T\n"
               << "                           Run a simulation\n"
               << "  fetch    [options]       Fetch ephemeris from NASA Horizons\n\n"
+              << "  build-system [options]   Fetch from Horizons and build a system JSON\n\n"
               << "For command-specific help:\n"
               << "  orbit-sim <command> --help\n\n";
 }
@@ -195,7 +234,30 @@ void printCommandHelp(const std::string& cmd)
                   << "  --start YYYY-MM-DD\n"
                   << "  --stop  YYYY-MM-DD\n"
                   << "  --step \"6 h\"       Step size\n"
-                  << "  --output FILE      Where to save results\n\n";
+                  << "  --output FILE      Where to save results\n"
+                  << "  --post             Use POST Horizons API mode (default)\n"
+                  << "  --get              Force legacy GET Horizons API mode\n\n";
+        return;
+    }
+
+    if (cmd == "build-system")
+    {
+        std::cout << "orbit-sim build-system — Fetch Horizons vectors and build system JSON\n\n"
+                  << "Options:\n"
+                  << "  --bodies ID1,ID2,...   Comma-separated Horizons IDs (e.g. 10,399,301)\n"
+                  << "  --epoch YYYY-MM-DD     Epoch for initial conditions\n"
+                  << "  --center @0            Reference center (default: @0)\n"
+                  << "  --output FILE          Output JSON path (e.g. systems/earth_moon_real.json)\n"
+                  << "  --post                 Use POST Horizons API mode (default)\n"
+                  << "  --get                  Force legacy GET Horizons API mode\n"
+                  << "  --verbose              Show fetch debug details\n"
+                  << "  --run                  Run simulation immediately after building\n"
+                  << "  --steps N              (if --run) simulation steps\n"
+                  << "  --dt T                 (if --run) timestep in seconds\n"
+                  << "  --stride N             (if --run) write CSV every N steps\n\n"
+                  << "Example:\n"
+                  << "  orbit-sim build-system --bodies 10,399,301 --epoch 2025-01-01 \\\n"
+                  << "      --output systems/earth_moon_real.json\n";
         return;
     }
 

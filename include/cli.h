@@ -43,7 +43,13 @@ struct CLIOptions
     std::string fetchStep;
     std::string output;
 
-    bool usePost = false;
+    // build-system
+    std::string buildBodies;
+    std::string buildEpoch;
+    std::string buildCenter;
+    bool buildRun = false;
+
+    bool usePost = true;
     bool verbose = false;
     bool normalize = false;
 };
