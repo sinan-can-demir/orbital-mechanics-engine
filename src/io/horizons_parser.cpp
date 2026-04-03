@@ -75,7 +75,8 @@ bool parseHorizonsVectors(const std::string& path, HorizonsState& state)
 
     if (!std::getline(in, epochLine) || !std::getline(in, xyzLine) || !std::getline(in, vxyzLine))
     {
-        std::cerr << "❌ parseHorizonsVectors: truncated data block after $$SOE in: " << path << "\n";
+        std::cerr << "❌ parseHorizonsVectors: truncated data block after $$SOE in: " << path
+                  << "\n";
         return false;
     }
 

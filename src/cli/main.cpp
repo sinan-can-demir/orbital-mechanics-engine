@@ -327,7 +327,8 @@ int main(int argc, char** argv)
               << "  orbit-sim validate --system <file.json>\n"
               << "  orbit-sim run      --system <file.json> --steps N --dt T\n"
               << "  orbit-sim fetch    --body <ID> --start <date> --stop <date> --output <file>\n"
-              << "  orbit-sim build-system --bodies <id1,id2,...> --epoch <YYYY-MM-DD> --output <file.json>\n";
+              << "  orbit-sim build-system --bodies <id1,id2,...> --epoch <YYYY-MM-DD> --output "
+                 "<file.json>\n";
 
     return 1;
 }

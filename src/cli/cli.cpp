@@ -242,22 +242,23 @@ void printCommandHelp(const std::string& cmd)
 
     if (cmd == "build-system")
     {
-        std::cout << "orbit-sim build-system — Fetch Horizons vectors and build system JSON\n\n"
-                  << "Options:\n"
-                  << "  --bodies ID1,ID2,...   Comma-separated Horizons IDs (e.g. 10,399,301)\n"
-                  << "  --epoch YYYY-MM-DD     Epoch for initial conditions\n"
-                  << "  --center @0            Reference center (default: @0)\n"
-                  << "  --output FILE          Output JSON path (e.g. systems/earth_moon_real.json)\n"
-                  << "  --post                 Use POST Horizons API mode (default)\n"
-                  << "  --get                  Force legacy GET Horizons API mode\n"
-                  << "  --verbose              Show fetch debug details\n"
-                  << "  --run                  Run simulation immediately after building\n"
-                  << "  --steps N              (if --run) simulation steps\n"
-                  << "  --dt T                 (if --run) timestep in seconds\n"
-                  << "  --stride N             (if --run) write CSV every N steps\n\n"
-                  << "Example:\n"
-                  << "  orbit-sim build-system --bodies 10,399,301 --epoch 2025-01-01 \\\n"
-                  << "      --output systems/earth_moon_real.json\n";
+        std::cout
+            << "orbit-sim build-system — Fetch Horizons vectors and build system JSON\n\n"
+            << "Options:\n"
+            << "  --bodies ID1,ID2,...   Comma-separated Horizons IDs (e.g. 10,399,301)\n"
+            << "  --epoch YYYY-MM-DD     Epoch for initial conditions\n"
+            << "  --center @0            Reference center (default: @0)\n"
+            << "  --output FILE          Output JSON path (e.g. systems/earth_moon_real.json)\n"
+            << "  --post                 Use POST Horizons API mode (default)\n"
+            << "  --get                  Force legacy GET Horizons API mode\n"
+            << "  --verbose              Show fetch debug details\n"
+            << "  --run                  Run simulation immediately after building\n"
+            << "  --steps N              (if --run) simulation steps\n"
+            << "  --dt T                 (if --run) timestep in seconds\n"
+            << "  --stride N             (if --run) write CSV every N steps\n\n"
+            << "Example:\n"
+            << "  orbit-sim build-system --bodies 10,399,301 --epoch 2025-01-01 \\\n"
+            << "      --output systems/earth_moon_real.json\n";
         return;
     }
 

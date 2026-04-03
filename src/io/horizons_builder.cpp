@@ -22,11 +22,11 @@ struct BodyMeta
 };
 
 const std::unordered_map<std::string, BodyMeta> kKnownBodies = {
-    {"10", {"Sun", 1.98847e30}},      {"199", {"Mercury", 3.3011e23}},
-    {"299", {"Venus", 4.8675e24}},    {"399", {"Earth", 5.9722e24}},
-    {"301", {"Moon", 7.342e22}},      {"499", {"Mars", 6.4171e23}},
-    {"599", {"Jupiter", 1.8982e27}},  {"699", {"Saturn", 5.6834e26}},
-    {"799", {"Uranus", 8.6810e25}},   {"899", {"Neptune", 1.02413e26}},
+    {"10", {"Sun", 1.98847e30}},     {"199", {"Mercury", 3.3011e23}},
+    {"299", {"Venus", 4.8675e24}},   {"399", {"Earth", 5.9722e24}},
+    {"301", {"Moon", 7.342e22}},     {"499", {"Mars", 6.4171e23}},
+    {"599", {"Jupiter", 1.8982e27}}, {"699", {"Saturn", 5.6834e26}},
+    {"799", {"Uranus", 8.6810e25}},  {"899", {"Neptune", 1.02413e26}},
 };
 
 std::string trim(const std::string& s)
@@ -182,8 +182,8 @@ bool buildSystemFromHorizons(const BuildSystemOptions& opts)
     std::ostringstream systemName;
     systemName << "HORIZONS generated system (" << opts.epoch << ")";
 
-    const bool written = writeSystemJSON(bodies, systemName.str(), opts.epoch + " 00:00:00 TDB",
-                                         opts.output);
+    const bool written =
+        writeSystemJSON(bodies, systemName.str(), opts.epoch + " 00:00:00 TDB", opts.output);
     if (!written)
     {
         return false;

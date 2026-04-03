@@ -62,14 +62,16 @@ int main()
             return 1;
         }
 
-        if (!nearlyEqual(e.position.x(), g.position.x()) || !nearlyEqual(e.position.y(), g.position.y()) ||
+        if (!nearlyEqual(e.position.x(), g.position.x()) ||
+            !nearlyEqual(e.position.y(), g.position.y()) ||
             !nearlyEqual(e.position.z(), g.position.z()))
         {
             std::cerr << "FAIL: position mismatch for " << e.name << "\n";
             return 1;
         }
 
-        if (!nearlyEqual(e.velocity.x(), g.velocity.x()) || !nearlyEqual(e.velocity.y(), g.velocity.y()) ||
+        if (!nearlyEqual(e.velocity.x(), g.velocity.x()) ||
+            !nearlyEqual(e.velocity.y(), g.velocity.y()) ||
             !nearlyEqual(e.velocity.z(), g.velocity.z()))
         {
             std::cerr << "FAIL: velocity mismatch for " << e.name << "\n";
