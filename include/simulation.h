@@ -32,8 +32,9 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
 void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt);
 void leapfrogStep(std::vector<CelestialBody>& bodies, double dt);
-
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
-                   const std::string& outputPath, Integrator integrator = Integrator::RK4);
+                   const std::string& outputPath,
+                   Integrator integrator = Integrator::RK4,
+                   int stride = 1);
 
 #endif // SIMULATION_H

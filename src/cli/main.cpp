@@ -201,15 +201,19 @@ int main(int argc, char** argv)
                 return 1;
             }
 
+            // In the run block, alongside steps and dt:
+            int stride = (opt.stride > 0 ? opt.stride : 1);
+                    
             std::cout << "Running simulation:\n"
                       << " - System:     " << opt.systemFile << "\n"
                       << " - Steps:      " << steps << "\n"
                       << " - dt:         " << dt << " seconds\n"
+                      << " - Stride:     " << stride << "\n"
                       << " - Output:     " << outPath << "\n"
                       << " - Integrator: "
                       << (integrator == Integrator::Leapfrog ? "Leapfrog" : "RK4") << "\n";
-
-            runSimulation(bodies, steps, dt, outPath, integrator);
+                    
+            runSimulation(bodies, steps, dt, outPath, integrator, stride);
         }
         catch (const std::exception& e)
         {

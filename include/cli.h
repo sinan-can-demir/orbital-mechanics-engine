@@ -32,6 +32,7 @@ struct CLIOptions
     std::string integrator;
 
     int steps = 0;
+    int stride= 1;
     double dt = 0;
 
     // fetch

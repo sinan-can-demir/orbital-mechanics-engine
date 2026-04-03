@@ -69,6 +69,10 @@ CLIOptions parseCLI(int argc, char** argv)
         {
             opt.dt = std::stod(argv[++i]);
         }
+        else if (a == "--stride" && i + 1 < argc)
+        {
+            opt.stride = std::stoi(argv[++i]);
+        }
         else if (a == "--output" && i + 1 < argc)
         {
             opt.output = argv[++i];
@@ -143,17 +147,16 @@ void printCommandHelp(const std::string& cmd)
 {
     if (cmd == "run")
     {
-        std::cout << "orbit-sim run — Execute a simulation\n\n"
-                  << "Options:\n"
-                  << "  --system FILE    Path to system JSON\n"
-                  << "  --integrator rk4|leapfrog   Integration method (default: rk4)\n"
-                  << "  --steps N        Number of integration steps\n"
-                  << "  --dt T           Timestep in seconds\n\n"
-                  << "  --normalize       Shift system so COM=0 and net momentum=0\n\n"
-                  << "Example:\n"
-                  << "  orbit-sim run --system systems/earth_moon.json --steps 8766 --dt "
-                     "3600\n";
-        return;
+        std::cout
+            << "  --system FILE              Path to system JSON\n"
+            << "  --steps N                  Number of integration steps\n"
+            << "  --dt T                     Timestep in seconds\n"
+            << "  --stride N                 Write one CSV row every N steps (default: 1)\n"
+            << "  --integrator rk4|leapfrog  Integration method (default: rk4)\n"
+            << "  --normalize                Shift system so COM=0 and net momentum=0\n\n"
+            << "Example:\n"
+            << "  orbit-sim run --system systems/earth_moon.json"
+               " --steps 5000000 --dt 60 --stride 1440\n";
     }
 
     if (cmd == "info")

@@ -8,6 +8,7 @@
 #include "simulation.h"
 #include "eclipse.h"
 #include "vec3.h"
+#include <filesystem>
 
 /****************
  * struct StateDerivative
@@ -250,7 +251,7 @@ bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEa
  * @return none
  *********************/
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
-                   const std::string& outputPath, Integrator integrator)
+                   const std::string& outputPath, Integrator integrator, int stride)
 {
     if (bodies.empty())
     {
@@ -277,7 +278,10 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     std::ofstream eclipseFile;
     if (isSEM)
     {
-        std::string eclipsePath = "build/eclipse_log.csv";
+        // Derive eclipse log path from the output path
+        // results/earth_moon.csv → results/earth_moon_eclipse.csv
+        std::filesystem::path p(outputPath);
+        std::string eclipsePath = (p.parent_path() / (p.stem().string() + "_eclipse.csv")).string();
         eclipseFile.open(eclipsePath);
 
         if (!eclipseFile)
@@ -339,6 +343,10 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         else
             rk4Step(bodies, dt);
 
+        // Only write to CSV every `stride` steps
+        if (i % stride != 0)
+            continue;
+        
         // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
 
