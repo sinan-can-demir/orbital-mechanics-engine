@@ -34,6 +34,18 @@ The orbital dynamics simulation employs a multi-layered validation approach to e
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Integrator comparison — empirical results
+
+Tested RK4 vs Leapfrog (Velocity Verlet) on the Sun-Earth-Moon system.
+
+Key finding: integrator choice depends on timestep size.
+- At dt=60s: RK4 conserves energy better over long runs (higher per-step accuracy)  
+- At dt=3600s: Leapfrog bounds energy growth (symplectic property), RK4 drifts
+
+Practical recommendation for this codebase:
+- dt < 600s  → use RK4
+- dt > 1800s → use Leapfrog
+
 ---
 
 ## Conservation Law Monitoring

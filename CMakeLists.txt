@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(EarthAndMoonOrbits VERSION 1.0 LANGUAGES C CXX)
+project(ORBITAL-MECHANICS-ENGINE VERSION 1.0 LANGUAGES C CXX)
 
 # ------------------------------------------------------------
 # Global Settings
@@ -27,7 +27,7 @@ if (BUILD_VIEWER)
     find_package(glfw3)
     find_package(glm)
 
-    if (NOT OpenGL_FOUND OR NOT GLFW3_FOUND OR NOT GLM_FOUND)
+    if (NOT OpenGL_FOUND OR NOT glfw3_FOUND OR NOT glm_FOUND)
         message(WARNING "OpenGL, GLFW3, or GLM not found. Disabling viewer.")
         set(BUILD_VIEWER OFF CACHE BOOL "Build OpenGL viewer" FORCE)
     endif()
