@@ -73,6 +73,10 @@ CLIOptions parseCLI(int argc, char** argv)
         {
             opt.output = argv[++i];
         }
+        else if (a == "--integrator" && i + 1 < argc)
+        {
+            opt.integrator = argv[++i];
+        }
 
         // ----- FETCH Options -----
         else if (a == "--body" && i + 1 < argc)
@@ -142,6 +146,7 @@ void printCommandHelp(const std::string& cmd)
         std::cout << "orbit-sim run — Execute a simulation\n\n"
                   << "Options:\n"
                   << "  --system FILE    Path to system JSON\n"
+                  << "  --integrator rk4|leapfrog   Integration method (default: rk4)\n"
                   << "  --steps N        Number of integration steps\n"
                   << "  --dt T           Timestep in seconds\n\n"
                   << "  --normalize       Shift system so COM=0 and net momentum=0\n\n"

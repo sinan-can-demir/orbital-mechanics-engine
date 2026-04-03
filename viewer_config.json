@@ -1,0 +1,14 @@
+{
+  "radius_scale": {
+    "Sun":     20.0,
+    "Mercury": 500.0,
+    "Venus":   500.0,
+    "Earth":   500.0,
+    "Moon":    800.0,
+    "Mars":    500.0,
+    "Jupiter": 200.0,
+    "Saturn":  200.0,
+    "Uranus":  200.0,
+    "Neptune": 200.0
+  }
+}

@@ -182,6 +182,36 @@ void rk4Step(std::vector<CelestialBody>& bodies, double dt)
     }
 }
 
+/**
+ * leapfrogStep
+ * 
+ * @brief: Symplectic leapfrog integrator for N-body system. Advances positions and
+ * velocities in a staggered manner to improve energy conservation over long timescales.
+ * @param bodies 
+ * @param dt 
+ * @exception none
+ * @return none
+ * @note: Requires that accelerations are already computed before the first call.
+ */
+void leapfrogStep(std::vector<CelestialBody>& bodies, double dt)
+{
+    // Step 1: half-kick velocity using current accelerations
+    // (accelerations must already be computed before first call)
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (dt * 0.5);
+
+    // Step 2: full position update using half-kicked velocity
+    for (auto& b : bodies)
+        b.position += b.velocity * dt;
+
+    // Step 3: recompute accelerations at new positions
+    updateAccelerations(bodies);
+
+    // Step 4: second half-kick with new accelerations
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (dt * 0.5);
+}
+
 /********************
  * detectSEM
  * @brief: Detects indices of Sun, Earth, and Moon in the bodies vector.
@@ -215,10 +245,12 @@ bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEa
  * @param steps      - number of steps to simulate
  * @param dt         - timestep in seconds
  * @param outputPath - CSV output file path
+ * @param integrator  - integration method to use (default: RK4)
+ * @exception none
  * @return none
  *********************/
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
-                   const std::string& outputPath)
+                   const std::string& outputPath, Integrator integrator)
 {
     if (bodies.empty())
     {
@@ -291,13 +323,21 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
          << "dE_rel,dL_rel,dP_rel\n";
 
     // ============================
+    // Seed accelerations for leapfrog before the loop
+    // ============================
+    if (integrator == Integrator::Leapfrog)
+        updateAccelerations(bodies);
+
+    // ============================
     // Main Integration Loop
     // ============================
     for (int i = 0; i < steps; ++i)
     {
-
-        // --- RK4 integration step ---
-        rk4Step(bodies, dt);
+        // --- Single integration step ---
+        if (integrator == Integrator::Leapfrog)
+            leapfrogStep(bodies, dt);
+        else
+            rk4Step(bodies, dt);
 
         // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
