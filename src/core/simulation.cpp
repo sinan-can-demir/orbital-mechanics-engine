@@ -185,11 +185,11 @@ void rk4Step(std::vector<CelestialBody>& bodies, double dt)
 
 /**
  * leapfrogStep
- * 
+ *
  * @brief: Symplectic leapfrog integrator for N-body system. Advances positions and
  * velocities in a staggered manner to improve energy conservation over long timescales.
- * @param bodies 
- * @param dt 
+ * @param bodies
+ * @param dt
  * @exception none
  * @return none
  * @note: Requires that accelerations are already computed before the first call.
@@ -346,7 +346,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         // Only write to CSV every `stride` steps
         if (i % stride != 0)
             continue;
-        
+
         // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
 

@@ -659,7 +659,8 @@ int main(int argc, char** argv)
 {
     // Init N-body positions first (Solar System) from simulation output
     std::string csvPath = (argc > 1) ? argv[1] : "./build/orbit_three_body.csv";
-    if (!initBodiesFromCSV(csvPath))    {
+    if (!initBodiesFromCSV(csvPath))
+    {
         return -1;
     }
 
@@ -675,8 +676,7 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow* win = glfwCreateWindow(g_windowWidth, g_windowHeight,
-                                       ("Orbit Viewer — " + csvPath).c_str(),
-                                       nullptr, nullptr);
+                                       ("Orbit Viewer — " + csvPath).c_str(), nullptr, nullptr);
 
     if (!win)
     {
