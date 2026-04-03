@@ -45,16 +45,9 @@ all: build
 # BUILD TARGETS
 # ========================================
 
-build: $(BUILD_DIR)/Makefile
-	@echo "$(GREEN)Building project...$(NC)"
-	@$(MAKE) -C $(BUILD_DIR) -j$$(nproc)
-	@echo "$(GREEN)Build complete. Executables in $(BUILD_DIR)/bin/$(NC)"
-
-$(BUILD_DIR)/Makefile:
-	@echo "$(BLUE)Configuring project with CMake...$(NC)"
-	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE_CONFIG)
-	@echo "$(GREEN)Configuration complete. Run 'make -C $(BUILD_DIR)' to build.$(NC)"
+build:
+	cmake -S . -B build -DBUILD_VIEWER=ON
+	cmake --build build --parallel
 
 build-sim: $(BUILD_DIR)/Makefile
 	@$(MAKE) -C $(BUILD_DIR) orbit-sim -j$$(nproc)
@@ -79,6 +72,7 @@ reconfigure:
 # ========================================
 
 run: $(SIM_EXE)
+	mkdir -p $(RESULTS_DIR)
 	@$(SIM_EXE) run \
 		--system $(DEFAULT_SYSTEM) \
 		--steps $(DEFAULT_STEPS) \

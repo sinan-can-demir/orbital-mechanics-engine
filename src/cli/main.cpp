@@ -1,7 +1,7 @@
 /********************
  * Author: Sinan Demir
- * File: main.cpp
- * Date: 11/19/2025
+ * File: src/climain.cpp
+ * Date: 04/02/2026
  * Purpose:
  *    Entry point for orbit-sim CLI application.
  *    Supports:
@@ -73,7 +73,6 @@ int main(int argc, char** argv)
     {
         if (!opt.systemFile.empty())
         {
-            // "systemFile" holds the subcommand name for help, e.g. "run"
             printCommandHelp(opt.systemFile);
         }
         else
@@ -117,7 +116,6 @@ int main(int argc, char** argv)
     // ----- FETCH (NASA HORIZONS) -----
     if (opt.command == "fetch")
     {
-
         if (opt.fetchBody.empty())
         {
             std::cerr << "❌ Must specify --body <ID or NAME>\n";
@@ -149,7 +147,6 @@ int main(int argc, char** argv)
                   << " - Step:   " << hopt.step_size << "\n"
                   << " - Output: " << opt.output << "\n";
 
-        // ✅ Use hopt and opt.output, and pass verbose
         bool ok = false;
 
         if (opt.usePost)
@@ -177,27 +174,46 @@ int main(int argc, char** argv)
             // Load system from JSON
             auto bodies = loadSystemFromJSON(opt.systemFile);
 
-            // NEW: normalize to barycenter if requested
+            // Normalize to barycenter if requested
             if (opt.normalize)
             {
                 std::cout << " - Normalizing to barycenter frame...\n";
                 physics::normalizeToBarycenter(bodies);
             }
 
-            // Determine simulation steps and dt
+            // Determine simulation parameters
             int steps = (opt.steps > 0 ? opt.steps : 8766);
-            double dt = (opt.dt > 0 ? opt.dt : 3600.0); // default: 1 hour
+            double dt = (opt.dt > 0 ? opt.dt : 3600.0);
 
-            // Default output if empty
+            // Default output path
             std::string outPath = opt.output.empty() ? "build/orbit_three_body.csv" : opt.output;
 
-            std::cout << "Running simulation:\n"
-                      << " - System: " << opt.systemFile << "\n"
-                      << " - Steps:  " << steps << "\n"
-                      << " - dt:     " << dt << " seconds\n"
-                      << " - Output: " << outPath << "\n";
+            // Resolve integrator
+            Integrator integrator = Integrator::RK4;
+            if (opt.integrator == "leapfrog")
+            {
+                integrator = Integrator::Leapfrog;
+            }
+            else if (!opt.integrator.empty() && opt.integrator != "rk4")
+            {
+                std::cerr << "❌ Unknown integrator: " << opt.integrator
+                          << ". Valid options: rk4, leapfrog\n";
+                return 1;
+            }
 
-            runSimulation(bodies, steps, dt, outPath);
+            // In the run block, alongside steps and dt:
+            int stride = (opt.stride > 0 ? opt.stride : 1);
+
+            std::cout << "Running simulation:\n"
+                      << " - System:     " << opt.systemFile << "\n"
+                      << " - Steps:      " << steps << "\n"
+                      << " - dt:         " << dt << " seconds\n"
+                      << " - Stride:     " << stride << "\n"
+                      << " - Output:     " << outPath << "\n"
+                      << " - Integrator: "
+                      << (integrator == Integrator::Leapfrog ? "Leapfrog" : "RK4") << "\n";
+
+            runSimulation(bodies, steps, dt, outPath, integrator, stride);
         }
         catch (const std::exception& e)
         {

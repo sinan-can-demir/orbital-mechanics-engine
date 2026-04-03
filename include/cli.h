@@ -11,6 +11,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include "simulation.h"
 
 /***********************
  * struct CLIOptions
@@ -28,8 +29,10 @@ struct CLIOptions
 {
     std::string command;
     std::string systemFile;
+    std::string integrator;
 
     int steps = 0;
+    int stride = 1;
     double dt = 0;
 
     // fetch
