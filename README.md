@@ -400,7 +400,7 @@ MIT License
 **Sinan Can Demir**  
 Aspiring Aerospace / Simulation Engineer  
 
-GitHub: https://github.com/eisensenpou  
+GitHub: https://github.com/sinan-can-demir  
 LinkedIn: https://linkedin.com/in/sinan-can-demir  
 
 ---
