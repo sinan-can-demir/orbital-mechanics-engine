@@ -12,6 +12,7 @@
 #include "body.h"
 #include "cli.h"
 #include "horizons.h"
+#include "horizons_builder.h"
 #include "json_loader.h"
 #include "ray.h"
 #include "simulation.h"

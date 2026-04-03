@@ -94,6 +94,9 @@ struct BodyRenderInfo
     float radius;                     // visual radius in GL units
     std::vector<glm::vec3> positions; // per-frame positions in GL units
     SphereMesh mesh;
+
+    GLuint orbitVAO = 0;
+    GLuint orbitVBO = 0;
 };
 
 static std::vector<BodyRenderInfo> g_bodies;
@@ -105,6 +108,8 @@ static size_t g_frameIndex = 0;
 static void handleLegendClick(double mouseX, double mouseY);
 static glm::vec3 getBodyPos(const std::string& name);
 static bool initBodiesFromCSV(const std::string& path);
+static void buildOrbitBuffers();
+static void destroyOrbitBuffers();
 
 // --------------------------------------------------
 // Callbacks
@@ -649,6 +654,44 @@ static bool initBodiesFromCSV(const std::string& path)
     return (g_numFrames > 0);
 }
 
+static void buildOrbitBuffers()
+{
+    for (auto& body : g_bodies)
+    {
+        if (body.positions.empty())
+            continue;
+
+        glGenVertexArrays(1, &body.orbitVAO);
+        glGenBuffers(1, &body.orbitVBO);
+
+        glBindVertexArray(body.orbitVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, body.orbitVBO);
+
+        glBufferData(GL_ARRAY_BUFFER, body.positions.size() * sizeof(glm::vec3),
+                     body.positions.data(), GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+}
+
+static void destroyOrbitBuffers()
+{
+    for (auto& body : g_bodies)
+    {
+        if (body.orbitVBO != 0)
+            glDeleteBuffers(1, &body.orbitVBO);
+        if (body.orbitVAO != 0)
+            glDeleteVertexArrays(1, &body.orbitVAO);
+
+        body.orbitVBO = 0;
+        body.orbitVAO = 0;
+    }
+}
+
 // --------------------------------------------------
 // MAIN
 // --------------------------------------------------
@@ -769,6 +812,34 @@ int main(int argc, char** argv)
         }
     )GLSL";
 
+    const char* orbitVs = R"GLSL(
+        #version 330 core
+        layout(location = 0) in vec3 aPos;
+
+        uniform mat4 uVP;
+
+        void main()
+        {
+            gl_Position = uVP * vec4(aPos, 1.0);
+        }
+    )GLSL";
+
+    const char* orbitFs = R"GLSL(
+        #version 330 core
+        out vec4 FragColor;
+
+        uniform vec3 uColor;
+
+        void main()
+        {
+            FragColor = vec4(uColor, 1.0);
+        }
+    )GLSL";
+
+    GLuint orbitShader = createProgram(orbitVs, orbitFs);
+    GLint orbitLocVP = glGetUniformLocation(orbitShader, "uVP");
+    GLint orbitLocColor = glGetUniformLocation(orbitShader, "uColor");
+
     GLuint shader = createProgram(vsSrc, fsSrc);
     GLint locMVP = glGetUniformLocation(shader, "uMVP");
     GLint locModel = glGetUniformLocation(shader, "uModel");
@@ -853,27 +924,58 @@ int main(int argc, char** argv)
 
             glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
 
+            glm::mat4 vp = proj * view;
+            size_t frame = g_frameIndex % g_numFrames;
+
+            // ---------------- Orbit line draw ----------------
+            glEnable(GL_DEPTH_TEST);
+            glUseProgram(orbitShader);
+            glUniformMatrix4fv(orbitLocVP, 1, GL_FALSE, glm::value_ptr(vp));
+            glLineWidth(2.0f);
+
+            for (auto& body : g_bodies)
+            {
+                if (body.orbitVAO == 0 || body.positions.empty())
+                    continue;
+
+                GLsizei count = static_cast<GLsizei>(std::min(frame + 1, body.positions.size()));
+                if (count < 2)
+                    continue;
+
+                glUniform3fv(orbitLocColor, 1, glm::value_ptr(body.color));
+                glBindVertexArray(body.orbitVAO);
+                glDrawArrays(GL_LINE_STRIP, 0, count);
+            }
+
+            glDisable(GL_DEPTH_TEST);
+
+            glBindVertexArray(0);
+
+            // ---------------- Sphere draw ----------------
             glUseProgram(shader);
 
             // view position for specular
             glUniform3fv(locViewPos, 1, glm::value_ptr(camPos));
+
             // light at Sun position (or origin if missing)
             glm::vec3 sunPos = getBodyPos("Sun");
             glUniform3fv(locLight, 1, glm::value_ptr(sunPos));
 
-            // ---------------- N-body draw ----------------
-            size_t frame = g_frameIndex % g_numFrames;
             for (auto& body : g_bodies)
             {
                 if (frame >= body.positions.size())
                     continue;
+
                 glm::mat4 model = glm::translate(glm::mat4(1.0f), body.positions[frame]);
                 glm::mat4 mvp = proj * view * model;
+
                 glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(mvp));
                 glUniformMatrix4fv(locModel, 1, GL_FALSE, glm::value_ptr(model));
                 glUniform3fv(locColor, 1, glm::value_ptr(body.color));
+
                 body.mesh.draw();
             }
+            buildOrbitBuffers();
         }
 
         // ------------------------------------------------
@@ -908,6 +1010,8 @@ int main(int argc, char** argv)
     glfwDestroyWindow(win);
 
     // cleanup legend objects
+    destroyOrbitBuffers();
+    glDeleteProgram(orbitShader);
     glDeleteBuffers(1, &g_legendVBO);
     glDeleteVertexArrays(1, &g_legendVAO);
     glDeleteProgram(g_legendShader);

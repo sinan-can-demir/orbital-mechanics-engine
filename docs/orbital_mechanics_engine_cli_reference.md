@@ -30,6 +30,7 @@ Use:
 ```
 ./bin/orbit-sim help run
 ./bin/orbit-sim help fetch
+./bin/orbit-sim help build-system
 ./bin/orbit-sim help validate
 ./bin/orbit-sim help info
 ./bin/orbit-sim help list
@@ -77,25 +78,40 @@ Use:
 
 ------------------------------------------------------------------------
 
-## 6. FETCH NASA HORIZONS EPHEMERIS --- GET MODE
+## 6. FETCH NASA HORIZONS EPHEMERIS --- POST MODE (DEFAULT)
 ```
-./bin/orbit-sim fetch   --body 399   --start 2025-01-01   --stop 2025-01-02   --step "6 h"   --output earth_raw.txt
-```
-------------------------------------------------------------------------
-
-## 7. FETCH NASA HORIZONS EPHEMERIS --- POST MODE
-```
-./bin/orbit-sim fetch   --body 399   --center @0   --start 2025-01-01   --stop 2025-01-02   --step "6 h"   --output earth_post.txt   --post   --verbose
+./bin/orbit-sim fetch   --body 399   --center @0   --start 2025-01-01   --stop 2025-01-02   --step "6 h"   --output earth_post_default.txt
 ```
 ------------------------------------------------------------------------
 
-## 8. UNKNOWN COMMAND TEST
+## 7. FETCH NASA HORIZONS EPHEMERIS --- FORCE GET MODE
+```
+./bin/orbit-sim fetch   --body 399   --center @0   --start 2025-01-01   --stop 2025-01-02   --step "6 h"   --output earth_get.txt   --get
+```
+------------------------------------------------------------------------
+
+## 8. BUILD SYSTEM FROM HORIZONS
+### Earth-Moon at 2025-01-01
+```
+./bin/orbit-sim build-system   --bodies 10,399,301   --epoch 2025-01-01   --output ../systems/earth_moon_real.json
+```
+### Solar System at 2025-01-01
+```
+./bin/orbit-sim build-system   --bodies 10,199,299,399,301,499,599,699,799,899   --epoch 2025-01-01   --output ../systems/solar_system_real.json
+```
+### Fetch/build and run immediately
+```
+./bin/orbit-sim build-system   --bodies 10,399,301   --epoch 2025-01-01   --output ../systems/earth_moon_real.json   --run   --steps 8760   --dt 3600
+```
+------------------------------------------------------------------------
+
+## 9. UNKNOWN COMMAND TEST
 ```
 ./bin/orbit-sim somethingInvalid
 ```
 ------------------------------------------------------------------------
 
-## 9. VIEW SIMULATION IN OPENGL VIEWER
+## 10. VIEW SIMULATION IN OPENGL VIEWER
 ```
 ./bin/orbit-viewer
 ```

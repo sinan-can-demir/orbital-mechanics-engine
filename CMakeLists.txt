@@ -53,6 +53,9 @@ add_library(orbit_core STATIC
     src/core/barycenter.cpp
     src/core/eclipse.cpp
     src/core/json_loader.cpp
+    src/io/horizons_parser.cpp
+    src/io/system_writer.cpp
+    src/io/horizons_builder.cpp
 )
 
 target_include_directories(orbit_core PUBLIC
@@ -127,5 +130,21 @@ add_executable(test_conservation tests/test_conservation.cpp)
 target_link_libraries(test_conservation PRIVATE orbit_core)
 
 target_include_directories(test_conservation PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+add_executable(test_horizons_parser tests/test_horizons_parser.cpp)
+
+target_link_libraries(test_horizons_parser PRIVATE orbit_core)
+
+target_include_directories(test_horizons_parser PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+add_executable(test_system_writer tests/test_system_writer.cpp)
+
+target_link_libraries(test_system_writer PRIVATE orbit_core)
+
+target_include_directories(test_system_writer PRIVATE
     ${PROJECT_SOURCE_DIR}/include
 )

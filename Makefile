@@ -16,7 +16,7 @@ SCRIPTS_DIR      := $(PROJECT_ROOT)/python
 
 # Executables
 SIM_EXE          := $(BUILD_DIR)/bin/orbit-sim
-VIEWER_EXE       := $(BUILD_DIR)/bin/orbit-viewer
+VIEWER_EXE       := ./utils/view.sh
 
 # Default simulation parameters
 DEFAULT_SYSTEM   := $(SYSTEMS_DIR)/earth_moon.json
@@ -36,6 +36,7 @@ NC               := \033[0m
 .PHONY: all build build-sim build-viewer clean reconfigure help
 .PHONY: run run-earth-moon run-solar-system view fetch validate validate-earth-moon test
 .PHONY: plot plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
+.PHONY: build-earth-moon build-solar-system pipeline-earth-moon
 .PHONY: format format-check
 
 # Default target
@@ -100,10 +101,16 @@ run-solar-system: $(SIM_EXE)
 	@echo "$(GREEN)Output: $(RESULTS_DIR)/solar_system_out.csv$(NC)"
 
 view: $(VIEWER_EXE)
-	@$(VIEWER_EXE) $(DEFAULT_OUTPUT)
+	@$(VIEWER_EXE)
 
-view-last: $(VIEWER_EXE)
-	@$(VIEWER_EXE) $(RESULTS_DIR)/earth_moon_out.csv
+view-last:
+	@LATEST=$$(ls -t $(RESULTS_DIR)/*_out.csv 2>/dev/null | head -n 1); \
+	if [ -z "$$LATEST" ]; then \
+		echo "❌ No simulation output files found."; \
+		exit 1; \
+	fi; \
+	echo "🚀 Viewing latest: $$LATEST"; \
+	$(VIEWER_EXE) "$$LATEST"
 
 fetch:
 	@$(SIM_EXE) fetch \
@@ -132,6 +139,29 @@ test: validate-earth-moon
 test-conservation: $(SIM_EXE)
 	@echo "$(BLUE)Running conservation test...$(NC)"
 	@./build/bin/test_conservation
+
+build-earth-moon: $(SIM_EXE)
+	@mkdir -p $(SYSTEMS_DIR)
+	@$(SIM_EXE) build-system \
+		--bodies 10,399,301 \
+		--epoch 2025-01-01 \
+		--output $(SYSTEMS_DIR)/earth_moon_horizons.json
+
+build-solar-system: $(SIM_EXE)
+	@mkdir -p $(SYSTEMS_DIR)
+	@$(SIM_EXE) build-system \
+		--bodies 10,199,299,399,301,499,599,699,799,899 \
+		--epoch 2025-01-01 \
+		--output $(SYSTEMS_DIR)/solar_system_horizons.json
+
+pipeline-earth-moon: build-earth-moon $(SIM_EXE)
+	@mkdir -p $(RESULTS_DIR)
+	@$(SIM_EXE) run \
+		--system $(SYSTEMS_DIR)/earth_moon_horizons.json \
+		--steps 876000 \
+		--dt 60 \
+		--output $(RESULTS_DIR)/earth_moon_horizons.csv
+	@$(VIEWER_EXE) $(RESULTS_DIR)/earth_moon_horizons.csv
 
 # ========================================
 # PYTHON PLOTTING TARGETS
@@ -204,6 +234,9 @@ help:
 	@echo ""
 	@echo "  Utility Targets:"
 	@echo "    make fetch              - Fetch HORIZONS ephemeris data"
+	@echo "    make build-earth-moon   - Build Earth-Moon JSON from HORIZONS (POST default)"
+	@echo "    make build-solar-system - Build Solar System JSON from HORIZONS (POST default)"
+	@echo "    make pipeline-earth-moon - Build HORIZONS JSON, run simulation, open viewer"
 	@echo "    make validate           - Validate default system file"
 	@echo "    make validate-earth-moon - Validate Earth-Moon system file"
 	@echo "    make test               - Quick validation test"
