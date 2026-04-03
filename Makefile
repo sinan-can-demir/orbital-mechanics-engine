@@ -16,7 +16,7 @@ SCRIPTS_DIR      := $(PROJECT_ROOT)/python
 
 # Executables
 SIM_EXE          := $(BUILD_DIR)/bin/orbit-sim
-VIEWER_EXE       := $(BUILD_DIR)/bin/orbit-viewer
+VIEWER_EXE       := ./utils/view.sh
 
 # Default simulation parameters
 DEFAULT_SYSTEM   := $(SYSTEMS_DIR)/earth_moon.json
@@ -100,10 +100,16 @@ run-solar-system: $(SIM_EXE)
 	@echo "$(GREEN)Output: $(RESULTS_DIR)/solar_system_out.csv$(NC)"
 
 view: $(VIEWER_EXE)
-	@$(VIEWER_EXE) $(DEFAULT_OUTPUT)
+	@$(VIEWER_EXE)
 
-view-last: $(VIEWER_EXE)
-	@$(VIEWER_EXE) $(RESULTS_DIR)/solar_system_out.csv
+view-last:
+	@LATEST=$$(ls -t $(RESULTS_DIR)/*_out.csv 2>/dev/null | head -n 1); \
+	if [ -z "$$LATEST" ]; then \
+		echo "❌ No simulation output files found."; \
+		exit 1; \
+	fi; \
+	echo "🚀 Viewing latest: $$LATEST"; \
+	$(VIEWER_EXE) "$$LATEST"
 
 fetch:
 	@$(SIM_EXE) fetch \
