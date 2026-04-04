@@ -12,7 +12,7 @@ Click "Fork" in the top-right corner of the GitHub page and clone your fork:
 ```bash
 git clone https://github.com/YOUR_USERNAME/orbital-mechanics-engine.git
 cd orbital-mechanics-engine
-git remote add upstream https://github.com/eisensenpou/orbital-mechanics-engine.git
+git remote add upstream https://github.com/sinan-can-demir/orbital-mechanics-engine.git
 ```
 
 ### 2. Create a Branch
@@ -86,7 +86,7 @@ vcpkg install curl glfw3 glm opengl
 
 ```bash
 # Clone and navigate to project
-git clone https://github.com/eisensenpou/orbital-mechanics-engine.git
+git clone https://github.com/sinan-can-demir/orbital-mechanics-engine.git
 cd orbital-mechanics-engine
 
 # Build Debug configuration (CI-compatible)
