@@ -852,6 +852,8 @@ int main(int argc, char** argv)
     // ----------------------------------------------------
     initLegendRenderer();
 
+    buildOrbitBuffers();
+
     // ----------------------------------------------------
     // Main render loop
     // ----------------------------------------------------
@@ -975,7 +977,6 @@ int main(int argc, char** argv)
 
                 body.mesh.draw();
             }
-            buildOrbitBuffers();
         }
 
         // ------------------------------------------------
