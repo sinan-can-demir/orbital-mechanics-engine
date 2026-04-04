@@ -303,13 +303,32 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     // Open main CSV file
     // ============================
     std::ofstream file(outputPath);
+    // Auto-create output directory if it doesn't exist
+    std::filesystem::path outPath(outputPath);
+    if (outPath.has_parent_path())
+    {
+        std::filesystem::create_directories(outPath.parent_path());
+    }
 
     if (!file)
     {
         std::cerr << "❌ Could not open output file: " << outputPath << "\n";
         return;
     }
-
+    // ============================
+    // Metadata comment line
+    // Viewer reads this to get stride, dt, and mass per body
+    // Format: # stride=N dt=T bodies=Name1:mass1,Name2:mass2,...
+    // ============================
+    file << "# stride=" << stride << " dt=" << dt << " bodies=";
+    for (std::size_t i = 0; i < bodies.size(); ++i)
+    {
+        file << bodies[i].name << ":" << bodies[i].mass;
+        if (i + 1 < bodies.size())
+            file << ",";
+    }
+    file << "\n";
+    
     /**********************************************
      * CSV HEADER (Generic for any N bodies)
      **********************************************/
