@@ -319,8 +319,8 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     // ============================
     // Open conservation file (Python reads this)
     // ============================
-    std::string conservPath = (outPath.parent_path()
-                              / (outPath.stem().string() + "_conservation.csv")).string();
+    std::string conservPath =
+        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
 
     std::ofstream conservFile(conservPath);
     if (!conservFile)
@@ -343,9 +343,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     // ============================
     file << "step";
     for (const auto& b : bodies)
-        file << ",x_" << b.name
-             << ",y_" << b.name
-             << ",z_" << b.name;
+        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
     file << "\n";
 
     // ============================
@@ -415,39 +413,26 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         // Positions row
         file << i;
         for (const auto& b : bodies)
-            file << "," << b.position.x()
-                 << "," << b.position.y()
-                 << "," << b.position.z();
+            file << "," << b.position.x() << "," << b.position.y() << "," << b.position.z();
         file << "\n";
 
         // Conservation row — write less frequently
         if (conservFile && i % (stride * 10) == 0)
         {
-            conservFile << i
-                        << "," << C.total_energy
-                        << "," << C.kinetic_energy
-                        << "," << C.potential_energy
-                        << "," << C.L[0]
-                        << "," << C.L[1]
-                        << "," << C.L[2]
-                        << "," << Lmag
-                        << "," << C.P[0]
-                        << "," << C.P[1]
-                        << "," << C.P[2]
-                        << "," << Pmag
-                        << "," << dE
-                        << "," << dL
-                        << "," << dP
-                        << "\n";
+            conservFile << i << "," << C.total_energy << "," << C.kinetic_energy << ","
+                        << C.potential_energy << "," << C.L[0] << "," << C.L[1] << "," << C.L[2]
+                        << "," << Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
+                        << Pmag << "," << dE << "," << dL << "," << dP << "\n";
         }
     }
 
     file.close();
     if (conservFile)
         conservFile.close();
-    
-    std::cout << "✅ Positions:     " << outputPath  << "\n";
-    std::cout << "✅ Conservation:  " << conservPath << "\n";    if (isSEM)
+
+    std::cout << "✅ Positions:     " << outputPath << "\n";
+    std::cout << "✅ Conservation:  " << conservPath << "\n";
+    if (isSEM)
     {
         eclipseFile.close();
     }

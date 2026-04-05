@@ -45,14 +45,14 @@ static int g_windowHeight = 720;
 // Orbit camera spherical coords
 static float g_yaw = glm::radians(45.0f);
 static float g_pitch = glm::radians(20.0f);
-static float g_radius = 5.0f;  // cam radius
+static float g_radius = 5.0f; // cam radius
 
 static bool g_mouseRotating = false;
 static double g_lastMouseX = 0.0;
 static double g_lastMouseY = 0.0;
 
 // Camera target selection (which body to orbit around)
-static int g_focusBodyIndex = -1;  // -1 = barycenter/origin
+static int g_focusBodyIndex = -1; // -1 = barycenter/origin
 
 // Legend rendering objects (2D)
 static GLuint g_legendShader = 0;
@@ -71,9 +71,9 @@ static const float LEGEND_SIZE_PX = 14.0f; // base square size
 // -------------------------------------------------
 // Playback control
 // -------------------------------------------------
-static double g_lastTime    = 0.0;
-static double g_simSpeed    = 1440.0;  // frames per real second
-static bool   g_paused      = false;
+static double g_lastTime = 0.0;
+static double g_simSpeed = 1440.0; // frames per real second
+static bool g_paused = false;
 static double g_accumulator = 0.0;
 
 // --------------------------------------------------
@@ -83,11 +83,11 @@ static double g_accumulator = 0.0;
 struct BodyRenderInfo
 {
     std::string name;
-    double      mass = 0.0;
-    glm::vec3   color;
-    float       radius;
+    double mass = 0.0;
+    glm::vec3 color;
+    float radius;
     std::vector<glm::vec3> positions;
-    SphereMesh  mesh;
+    SphereMesh mesh;
     GLuint orbitVAO = 0;
     GLuint orbitVBO = 0;
 };
@@ -95,8 +95,8 @@ struct BodyRenderInfo
 // ── CSV Metadata ─────────────────────────────────────────────────────────────
 struct CSVMetadata
 {
-    int    stride = 1;
-    double dt     = 3600.0;
+    int stride = 1;
+    double dt = 3600.0;
     std::unordered_map<std::string, double> masses; // name → kg
 };
 
@@ -332,9 +332,9 @@ static void drawLegendBox(float centerPx, float centerPy, float sizePx, const gl
 
 /**
  * @brief Handles click events on the legend.
- * 
- * @param mouseX 
- * @param mouseY 
+ *
+ * @param mouseX
+ * @param mouseY
  */
 static void handleLegendClick(double mouseX, double mouseY)
 {
@@ -344,10 +344,8 @@ static void handleLegendClick(double mouseX, double mouseY)
     {
         float y = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
 
-        if (mouseX >= LEGEND_BASE_X - half &&
-            mouseX <= LEGEND_BASE_X + half &&
-            mouseY >= y - half             &&
-            mouseY <= y + half)
+        if (mouseX >= LEGEND_BASE_X - half && mouseX <= LEGEND_BASE_X + half &&
+            mouseY >= y - half && mouseY <= y + half)
         {
             g_focusBodyIndex = static_cast<int>(i);
             std::cout << "📌 Focus: " << g_bodies[i].name << "\n";
@@ -366,7 +364,7 @@ static void handleLegendClick(double mouseX, double mouseY)
 
 // Distance scale: 1 GL unit = 5e9 meters
 static constexpr float DIST_SCALE_METERS = 1.0f / 5e9f;
-static float g_distVisScale = 1.0f;  // computed after loading
+static float g_distVisScale = 1.0f; // computed after loading
 
 /**
  * @brief Computes a uniform distance scale factor to apply to all positions, so that
@@ -374,9 +372,9 @@ static float g_distVisScale = 1.0f;  // computed after loading
  * a purely visual scaling for better visibility of outer planets, and does not affect
  * the relative geometry of orbits. The scale is computed based on the maximum raw distance
  * found in the loaded data, and is applied uniformly to all positions.
- * 
- * @param bodies 
- * @return float 
+ *
+ * @param bodies
+ * @return float
  */
 static float computeDistScale(const std::vector<BodyRenderInfo>& bodies)
 {
@@ -404,16 +402,16 @@ static float computeDistScale(const std::vector<BodyRenderInfo>& bodies)
     float scale = TARGET_GL / maxDist;
 
     std::cout << "🔭 Max orbital distance: " << maxDist << " GL units\n";
-    std::cout << "🔭 Dist scale computed:  " << scale   << "\n";
+    std::cout << "🔭 Dist scale computed:  " << scale << "\n";
 
     return scale;
 }
 
 /**
  * @brief Computes a deterministic color for a body based on its name.
- * 
- * @param name 
- * @return glm::vec3 
+ *
+ * @param name
+ * @return glm::vec3
  */
 static glm::vec3 computeBodyColor(const std::string& name)
 {
@@ -424,8 +422,8 @@ static glm::vec3 computeBodyColor(const std::string& name)
 
     // Keep colors bright enough to see on dark background
     // Lower bound 0.35 prevents dark/muddy colors
-    float r = 0.35f + 0.65f * ((hash & 0xFF)         / 255.0f);
-    float g = 0.35f + 0.65f * (((hash >> 8)  & 0xFF) / 255.0f);
+    float r = 0.35f + 0.65f * ((hash & 0xFF) / 255.0f);
+    float g = 0.35f + 0.65f * (((hash >> 8) & 0xFF) / 255.0f);
     float b = 0.35f + 0.65f * (((hash >> 16) & 0xFF) / 255.0f);
 
     return glm::vec3(r, g, b);
@@ -433,16 +431,16 @@ static glm::vec3 computeBodyColor(const std::string& name)
 
 /**
  * @brief Computes a visual radius for a body based on its mass, using Earth as a reference.
- * 
- * @param mass 
- * @return float 
+ *
+ * @param mass
+ * @return float
  */
 static float computeVisualRadius(double mass)
 {
     // Reference: Earth mass → Earth visual size in GL units
     // Every other body scales relative to this — no per-body hardcoding
-    const double M_EARTH    = 5.9722e24;
-    const float  R_EARTH_GL = 0.3f;
+    const double M_EARTH = 5.9722e24;
+    const float R_EARTH_GL = 0.3f;
 
     if (mass <= 0.0)
     {
@@ -455,14 +453,13 @@ static float computeVisualRadius(double mass)
     // Not perfectly accurate but gives correct relative ordering:
     // Sun >> Jupiter >> Earth > Moon
     double ratio = mass / M_EARTH;
-    float  r     = R_EARTH_GL * static_cast<float>(std::cbrt(ratio));
+    float r = R_EARTH_GL * static_cast<float>(std::cbrt(ratio));
 
     // Clamp for visual usability:
     // Without clamping: Sun = ~33 GL units (fills entire screen)
     // Without clamping: Moon = ~0.02 GL units (invisible)
-    return glm::clamp(r, 0.05f, 0.8f);  // Sun max = 0.8 instead of 1.5
+    return glm::clamp(r, 0.05f, 0.8f); // Sun max = 0.8 instead of 1.5
 }
-
 
 /**
  * @brief Returns the current position of a body (in GL units) for the active
@@ -499,16 +496,26 @@ static void parseMetadataComment(const std::string& line, CSVMetadata& meta)
     auto stridePos = line.find("stride=");
     if (stridePos != std::string::npos)
     {
-        try { meta.stride = std::stoi(line.substr(stridePos + 7)); }
-        catch (...) {}
+        try
+        {
+            meta.stride = std::stoi(line.substr(stridePos + 7));
+        }
+        catch (...)
+        {
+        }
     }
 
     // ── dt ───────────────────────────────────────────────────────────────────
     auto dtPos = line.find("dt=");
     if (dtPos != std::string::npos)
     {
-        try { meta.dt = std::stod(line.substr(dtPos + 3)); }
-        catch (...) {}
+        try
+        {
+            meta.dt = std::stod(line.substr(dtPos + 3));
+        }
+        catch (...)
+        {
+        }
     }
 
     // ── bodies=Sun:1.989e30,Earth:5.972e24,... ───────────────────────────────
@@ -531,11 +538,16 @@ static void parseMetadataComment(const std::string& line, CSVMetadata& meta)
         if (colonPos == std::string::npos)
             continue;
 
-        std::string name    = token.substr(0, colonPos);
+        std::string name = token.substr(0, colonPos);
         std::string massStr = token.substr(colonPos + 1);
 
-        try { meta.masses[name] = std::stod(massStr); }
-        catch (...) {}
+        try
+        {
+            meta.masses[name] = std::stod(massStr);
+        }
+        catch (...)
+        {
+        }
     }
 } // end parseMetadataComment
 
@@ -568,10 +580,8 @@ static bool initBodiesFromCSV(const std::string& path)
         parseMetadataComment(line, g_metadata);
 
         std::cout << "📊 Metadata:"
-                  << "  stride=" << g_metadata.stride
-                  << "  dt="     << g_metadata.dt     << "s"
-                  << "  bodies=" << g_metadata.masses.size()
-                  << "\n";
+                  << "  stride=" << g_metadata.stride << "  dt=" << g_metadata.dt << "s"
+                  << "  bodies=" << g_metadata.masses.size() << "\n";
 
         for (const auto& [name, mass] : g_metadata.masses)
             std::cout << "     " << name << " → " << mass << " kg\n";
@@ -584,7 +594,7 @@ static bool initBodiesFromCSV(const std::string& path)
         }
     }
     // If no metadata comment, line already contains the column header so continue
-    
+
     std::vector<std::string> columns;
     std::string col;
     std::stringstream ss(line);
@@ -610,8 +620,8 @@ static bool initBodiesFromCSV(const std::string& path)
             int iz = static_cast<int>(i + 2);
 
             BodyRenderInfo body;
-            body.name  = name;
-            body.mass  = 0.0;   // will be set from metadata if available
+            body.name = name;
+            body.mass = 0.0; // will be set from metadata if available
 
             // Look up mass from parsed metadata
             auto massIt = g_metadata.masses.find(name);
@@ -625,7 +635,7 @@ static bool initBodiesFromCSV(const std::string& path)
                           << " — visual radius will use fallback\n";
             }
 
-            body.color  = computeBodyColor(name);
+            body.color = computeBodyColor(name);
             body.radius = computeVisualRadius(body.mass);
             g_bodyIndex[name] = g_bodies.size();
             g_bodies.push_back(std::move(body));
@@ -681,7 +691,6 @@ static bool initBodiesFromCSV(const std::string& path)
             glm::vec3 p(static_cast<float>(x * SCALE_METERS), static_cast<float>(y * SCALE_METERS),
                         static_cast<float>(z * SCALE_METERS));
 
-            
             p *= g_distVisScale;
 
             framePos[bi] = p;
@@ -761,7 +770,7 @@ int main(int argc, char** argv)
     // framesPerSimDay    = 86400 / simSecondsPerFrame
     {
         double simSecondsPerFrame = static_cast<double>(g_metadata.stride) * g_metadata.dt;
-        double framesPerSimDay    = 86400.0 / simSecondsPerFrame;
+        double framesPerSimDay = 86400.0 / simSecondsPerFrame;
 
         // Clamp to a sane range — don't play at 0.001 fps or 100000 fps
         g_simSpeed = glm::clamp(framesPerSimDay, 1.0, 10000.0);
@@ -923,10 +932,10 @@ int main(int argc, char** argv)
     {
         glfwPollEvents();
 
-        double now    = glfwGetTime();
+        double now = glfwGetTime();
         double dtReal = now - g_lastTime;
-        g_lastTime    = now;
-        dtReal        = std::min(dtReal, 0.05);
+        g_lastTime = now;
+        dtReal = std::min(dtReal, 0.05);
 
         if (!g_paused && g_numFrames > 0)
         {
@@ -947,9 +956,8 @@ int main(int argc, char** argv)
             size_t frame = g_frameIndex % g_numFrames;
 
             // Determine camera target position
-            glm::vec3 target(0.0f);  // default: barycenter
-            if (g_focusBodyIndex >= 0 &&
-                g_focusBodyIndex < static_cast<int>(g_bodies.size()))
+            glm::vec3 target(0.0f); // default: barycenter
+            if (g_focusBodyIndex >= 0 && g_focusBodyIndex < static_cast<int>(g_bodies.size()))
             {
                 target = g_bodies[g_focusBodyIndex].positions[frame];
             }
@@ -1031,10 +1039,10 @@ int main(int argc, char** argv)
 
         for (size_t i = 0; i < g_bodies.size(); ++i)
         {
-            float y        = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
-            bool  selected = (g_focusBodyIndex == static_cast<int>(i));
-            float size     = selected ? LEGEND_SIZE_PX * 1.4f : LEGEND_SIZE_PX;
-        
+            float y = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
+            bool selected = (g_focusBodyIndex == static_cast<int>(i));
+            float size = selected ? LEGEND_SIZE_PX * 1.4f : LEGEND_SIZE_PX;
+
             drawLegendBox(LEGEND_BASE_X, y, size, g_bodies[i].color);
         }
         glEnable(GL_DEPTH_TEST);
