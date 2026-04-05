@@ -51,23 +51,8 @@ static bool g_mouseRotating = false;
 static double g_lastMouseX = 0.0;
 static double g_lastMouseY = 0.0;
 
-// Camera target selection
-enum class CameraTarget
-{
-    Barycenter = 0,
-    Sun,
-    Mercury,
-    Venus,
-    Earth,
-    Moon,
-    Mars,
-    Jupiter,
-    Saturn,
-    Uranus,
-    Neptune
-};
-
-static CameraTarget g_cameraTarget = CameraTarget::Barycenter;
+// Camera target selection (which body to orbit around)
+static int g_focusBodyIndex = -1;  // -1 = barycenter/origin
 
 // Legend rendering objects (2D)
 static GLuint g_legendShader = 0;
@@ -199,53 +184,6 @@ static void scroll_callback(GLFWwindow*, double /*xoff*/, double yoff)
     float zoomSpeed = std::max(0.0000005f, g_radius * 0.1f);
     g_radius -= static_cast<float>(yoff) * zoomSpeed;
     g_radius = glm::clamp(g_radius, 0.00000001f, 100000.0f);
-}
-
-/**
- * @brief Keyboard controls:
- *  1 = Sun, 2 = Mercury, 3 = Venus, 4 = Earth, 5 = Moon,
- *  6 = Mars, 7 = Jupiter, 8 = Saturn, 9 = Uranus, 0 = Neptune
- */
-static void key_callback(GLFWwindow* /*win*/, int key, int /*scancode*/, int action, int /*mods*/)
-{
-    if (action != GLFW_PRESS)
-        return;
-
-    switch (key)
-    {
-    case GLFW_KEY_1:
-        g_cameraTarget = CameraTarget::Sun;
-        break;
-    case GLFW_KEY_2:
-        g_cameraTarget = CameraTarget::Mercury;
-        break;
-    case GLFW_KEY_3:
-        g_cameraTarget = CameraTarget::Venus;
-        break;
-    case GLFW_KEY_4:
-        g_cameraTarget = CameraTarget::Earth;
-        break;
-    case GLFW_KEY_5:
-        g_cameraTarget = CameraTarget::Moon;
-        break;
-    case GLFW_KEY_6:
-        g_cameraTarget = CameraTarget::Mars;
-        break;
-    case GLFW_KEY_7:
-        g_cameraTarget = CameraTarget::Jupiter;
-        break;
-    case GLFW_KEY_8:
-        g_cameraTarget = CameraTarget::Saturn;
-        break;
-    case GLFW_KEY_9:
-        g_cameraTarget = CameraTarget::Uranus;
-        break;
-    case GLFW_KEY_0:
-        g_cameraTarget = CameraTarget::Neptune;
-        break;
-    default:
-        break;
-    }
 }
 
 // --------------------------------------------------
@@ -393,46 +331,33 @@ static void drawLegendBox(float centerPx, float centerPy, float sizePx, const gl
 }
 
 /**
- * @brief Handle a left-click; if it lands on a legend box,
- *        update camera target (Sun/Earth/Moon).
+ * @brief Handles click events on the legend.
+ * 
+ * @param mouseX 
+ * @param mouseY 
  */
 static void handleLegendClick(double mouseX, double mouseY)
 {
-    // Legend row centers in pixels
-    float centersY[3] = {LEGEND_BASE_Y, LEGEND_BASE_Y + LEGEND_SPACING,
-                         LEGEND_BASE_Y + 2.0f * LEGEND_SPACING};
+    float half = LEGEND_SIZE_PX * 0.5f;
 
-    float halfSize = LEGEND_SIZE_PX * 0.5f;
-    float x0 = LEGEND_BASE_X - halfSize;
-    float x1 = LEGEND_BASE_X + halfSize;
-
-    for (int i = 0; i < 3; ++i)
+    for (size_t i = 0; i < g_bodies.size(); ++i)
     {
-        float yCenter = centersY[i];
-        float y0 = yCenter - halfSize;
-        float y1 = yCenter + halfSize;
+        float y = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
 
-        if (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1)
+        if (mouseX >= LEGEND_BASE_X - half &&
+            mouseX <= LEGEND_BASE_X + half &&
+            mouseY >= y - half             &&
+            mouseY <= y + half)
         {
-
-            switch (i)
-            {
-            case 0:
-                g_cameraTarget = CameraTarget::Sun;
-                break;
-            case 1:
-                g_cameraTarget = CameraTarget::Earth;
-                break;
-            case 2:
-                g_cameraTarget = CameraTarget::Moon;
-                break;
-            }
-
-            std::cout << "📌 Camera target set to "
-                      << (i == 0 ? "Sun" : (i == 1 ? "Earth" : "Moon")) << "\n";
+            g_focusBodyIndex = static_cast<int>(i);
+            std::cout << "📌 Focus: " << g_bodies[i].name << "\n";
             return;
         }
     }
+
+    // Click below all legend items → reset to barycenter
+    g_focusBodyIndex = -1;
+    std::cout << "📌 Focus: barycenter\n";
 }
 
 // --------------------------------------------------
@@ -871,7 +796,6 @@ int main(int argc, char** argv)
     glfwSetMouseButtonCallback(win, mouse_button_callback);
     glfwSetCursorPosCallback(win, cursor_pos_callback);
     glfwSetScrollCallback(win, scroll_callback);
-    glfwSetKeyCallback(win, key_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -999,9 +923,19 @@ int main(int argc, char** argv)
     {
         glfwPollEvents();
 
-        if (g_numFrames > 0)
+        double now    = glfwGetTime();
+        double dtReal = now - g_lastTime;
+        g_lastTime    = now;
+        dtReal        = std::min(dtReal, 0.05);
+
+        if (!g_paused && g_numFrames > 0)
         {
-            g_frameIndex = (g_frameIndex + 1) % g_numFrames;
+            g_accumulator += dtReal * g_simSpeed;
+            while (g_accumulator >= 1.0)
+            {
+                g_frameIndex = (g_frameIndex + 1) % g_numFrames;
+                g_accumulator -= 1.0;
+            }
         }
 
         glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // deep navy space
@@ -1009,44 +943,15 @@ int main(int argc, char** argv)
 
         if (!g_bodies.empty() && g_numFrames > 0)
         {
+
+            size_t frame = g_frameIndex % g_numFrames;
+
             // Determine camera target position
-            glm::vec3 target(0.0f);
-            switch (g_cameraTarget)
+            glm::vec3 target(0.0f);  // default: barycenter
+            if (g_focusBodyIndex >= 0 &&
+                g_focusBodyIndex < static_cast<int>(g_bodies.size()))
             {
-            case CameraTarget::Sun:
-                target = getBodyPos("Sun");
-                break;
-            case CameraTarget::Mercury:
-                target = getBodyPos("Mercury");
-                break;
-            case CameraTarget::Venus:
-                target = getBodyPos("Venus");
-                break;
-            case CameraTarget::Earth:
-                target = getBodyPos("Earth");
-                break;
-            case CameraTarget::Moon:
-                target = getBodyPos("Moon");
-                break;
-            case CameraTarget::Mars:
-                target = getBodyPos("Mars");
-                break;
-            case CameraTarget::Jupiter:
-                target = getBodyPos("Jupiter");
-                break;
-            case CameraTarget::Saturn:
-                target = getBodyPos("Saturn");
-                break;
-            case CameraTarget::Uranus:
-                target = getBodyPos("Uranus");
-                break;
-            case CameraTarget::Neptune:
-                target = getBodyPos("Neptune");
-                break;
-            case CameraTarget::Barycenter:
-            default:
-                target = glm::vec3(0.0f);
-                break;
+                target = g_bodies[g_focusBodyIndex].positions[frame];
             }
 
             // Camera offset in local spherical coords
@@ -1065,7 +970,6 @@ int main(int argc, char** argv)
             glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
 
             glm::mat4 vp = proj * view;
-            size_t frame = g_frameIndex % g_numFrames;
 
             // ---------------- Orbit line draw ----------------
             glEnable(GL_DEPTH_TEST);
@@ -1125,22 +1029,14 @@ int main(int argc, char** argv)
         float size = LEGEND_SIZE_PX;
         float sizeSel = LEGEND_SIZE_PX * 1.4f; // highlight selected
 
-        float y0 = LEGEND_BASE_Y;
-        float y1 = LEGEND_BASE_Y + LEGEND_SPACING;
-        float y2 = LEGEND_BASE_Y + 2.0f * LEGEND_SPACING;
-
-        // Sun icon (top)
-        drawLegendBox(LEGEND_BASE_X, y0, (g_cameraTarget == CameraTarget::Sun ? sizeSel : size),
-                      glm::vec3(1.4f, 1.1f, 0.3f));
-
-        // Earth icon (middle)
-        drawLegendBox(LEGEND_BASE_X, y1, (g_cameraTarget == CameraTarget::Earth ? sizeSel : size),
-                      glm::vec3(0.2f, 0.8f, 1.2f));
-
-        // Moon icon (bottom)
-        drawLegendBox(LEGEND_BASE_X, y2, (g_cameraTarget == CameraTarget::Moon ? sizeSel : size),
-                      glm::vec3(0.85f, 0.85f, 0.92f));
-
+        for (size_t i = 0; i < g_bodies.size(); ++i)
+        {
+            float y        = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
+            bool  selected = (g_focusBodyIndex == static_cast<int>(i));
+            float size     = selected ? LEGEND_SIZE_PX * 1.4f : LEGEND_SIZE_PX;
+        
+            drawLegendBox(LEGEND_BASE_X, y, size, g_bodies[i].color);
+        }
         glEnable(GL_DEPTH_TEST);
 
         glfwSwapBuffers(win);
