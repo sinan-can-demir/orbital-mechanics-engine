@@ -484,30 +484,26 @@ static float computeDistScale(const std::vector<BodyRenderInfo>& bodies)
     return scale;
 }
 
-// Color map for Solar System bodies
-static glm::vec3 colorForBody(const std::string& name)
+/**
+ * @brief Computes a deterministic color for a body based on its name.
+ * 
+ * @param name 
+ * @return glm::vec3 
+ */
+static glm::vec3 computeBodyColor(const std::string& name)
 {
-    if (name == "Sun")
-        return {1.4f, 1.1f, 0.3f};
-    if (name == "Mercury")
-        return {0.7f, 0.7f, 0.7f};
-    if (name == "Venus")
-        return {1.0f, 0.9f, 0.6f};
-    if (name == "Earth")
-        return {0.2f, 0.8f, 1.2f};
-    if (name == "Moon")
-        return {0.85f, 0.85f, 0.92f};
-    if (name == "Mars")
-        return {0.9f, 0.3f, 0.2f};
-    if (name == "Jupiter")
-        return {1.0f, 0.7f, 0.4f};
-    if (name == "Saturn")
-        return {1.0f, 0.8f, 0.5f};
-    if (name == "Uranus")
-        return {0.5f, 0.8f, 1.0f};
-    if (name == "Neptune")
-        return {0.3f, 0.4f, 1.0f};
-    return {1.0f, 1.0f, 1.0f};
+    // Hash the name → deterministic color
+    // Same name always produces same color across runs
+    // Works for any body name — no hardcoding needed
+    size_t hash = std::hash<std::string>{}(name);
+
+    // Keep colors bright enough to see on dark background
+    // Lower bound 0.35 prevents dark/muddy colors
+    float r = 0.35f + 0.65f * ((hash & 0xFF)         / 255.0f);
+    float g = 0.35f + 0.65f * (((hash >> 8)  & 0xFF) / 255.0f);
+    float b = 0.35f + 0.65f * (((hash >> 16) & 0xFF) / 255.0f);
+
+    return glm::vec3(r, g, b);
 }
 
 /**
@@ -704,7 +700,7 @@ static bool initBodiesFromCSV(const std::string& path)
                           << " — visual radius will use fallback\n";
             }
 
-            body.color  = colorForBody(name);   // still hardcoded for now — Phase 3 fixes this
+            body.color  = computeBodyColor(name);
             body.radius = computeVisualRadius(body.mass);
             g_bodyIndex[name] = g_bodies.size();
             g_bodies.push_back(std::move(body));
