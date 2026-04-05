@@ -45,7 +45,7 @@ static int g_windowHeight = 720;
 // Orbit camera spherical coords
 static float g_yaw = glm::radians(45.0f);
 static float g_pitch = glm::radians(20.0f);
-static float g_radius = 250.0f; // distance from target (in GL units)
+static float g_radius = 5.0f;  // cam radius
 
 static bool g_mouseRotating = false;
 static double g_lastMouseX = 0.0;
@@ -441,15 +441,48 @@ static void handleLegendClick(double mouseX, double mouseY)
 
 // Distance scale: 1 GL unit = 5e9 meters
 static constexpr float DIST_SCALE_METERS = 1.0f / 5e9f;
+static float g_distVisScale = 1.0f;  // computed after loading
 
-// Additional uniform compression for visualization.
-// After converting meters → GL, we multiply positions by this:
-// 1.0f  = no extra compression (true scale in GL)
-// 0.02f = 2% of that distance → outer planets pulled in so you can see them
-static constexpr float DIST_VIS_SCALE = 0.02f;
+/**
+ * @brief Computes a uniform distance scale factor to apply to all positions, so that
+ * the outermost orbit fits within a reasonable distance from the center. This is
+ * a purely visual scaling for better visibility of outer planets, and does not affect
+ * the relative geometry of orbits. The scale is computed based on the maximum raw distance
+ * found in the loaded data, and is applied uniformly to all positions.
+ * 
+ * @param bodies 
+ * @return float 
+ */
+static float computeDistScale(const std::vector<BodyRenderInfo>& bodies)
+{
+    float maxDist = 0.0f;
 
-// Moon orbit exaggeration (for visibility). Set to 1.0f for strict realism.
-static constexpr float MOON_EXAGGERATION = 15.0f;
+    for (const auto& body : bodies)
+    {
+        for (const auto& pos : body.positions)
+        {
+            // pos is already in GL units (after DIST_SCALE_METERS)
+            // but before vis compression — measure raw GL distance
+            maxDist = std::max(maxDist, glm::length(pos));
+        }
+    }
+
+    if (maxDist < 1e-9f)
+    {
+        std::cerr << "⚠️  computeDistScale: all positions near zero\n";
+        return 1.0f;
+    }
+
+    // Scale so the outermost orbit fits within TARGET_GL units from center
+    // TARGET_GL = 50 means the whole system fits in a 100-unit wide box
+    const float TARGET_GL = 50.0f;
+    float scale = TARGET_GL / maxDist;
+
+    std::cout << "🔭 Max orbital distance: " << maxDist << " GL units\n";
+    std::cout << "🔭 Dist scale computed:  " << scale   << "\n";
+
+    return scale;
+}
 
 // Color map for Solar System bodies
 static glm::vec3 colorForBody(const std::string& name)
@@ -477,35 +510,38 @@ static glm::vec3 colorForBody(const std::string& name)
     return {1.0f, 1.0f, 1.0f};
 }
 
-// Physical radii in meters → GL units (no exaggeration)
-static float radiusForBody(const std::string& name)
+/**
+ * @brief Computes a visual radius for a body based on its mass, using Earth as a reference.
+ * 
+ * @param mass 
+ * @return float 
+ */
+static float computeVisualRadius(double mass)
 {
-    float r_m = 6.0e6f; // default ~Earth-sized as fallback
+    // Reference: Earth mass → Earth visual size in GL units
+    // Every other body scales relative to this — no per-body hardcoding
+    const double M_EARTH    = 5.9722e24;
+    const float  R_EARTH_GL = 0.3f;
 
-    if (name == "Sun")
-        r_m = 6.9634e8f;
-    else if (name == "Mercury")
-        r_m = 2.4397e6f;
-    else if (name == "Venus")
-        r_m = 6.0518e6f;
-    else if (name == "Earth")
-        r_m = 6.3710e6f;
-    else if (name == "Moon")
-        r_m = 1.7374e6f;
-    else if (name == "Mars")
-        r_m = 3.3895e6f;
-    else if (name == "Jupiter")
-        r_m = 6.9911e7f;
-    else if (name == "Saturn")
-        r_m = 5.8232e7f;
-    else if (name == "Uranus")
-        r_m = 2.5362e7f;
-    else if (name == "Neptune")
-        r_m = 2.4622e7f;
+    if (mass <= 0.0)
+    {
+        std::cerr << "⚠️  computeVisualRadius: no mass data, using fallback\n";
+        return 0.15f;
+    }
 
-    // meters → GL units (no extra radius exaggeration)
-    return r_m * DIST_SCALE_METERS;
+    // Physical radius scales as cube root of mass
+    // R ∝ M^(1/3) — assumes roughly constant density across bodies
+    // Not perfectly accurate but gives correct relative ordering:
+    // Sun >> Jupiter >> Earth > Moon
+    double ratio = mass / M_EARTH;
+    float  r     = R_EARTH_GL * static_cast<float>(std::cbrt(ratio));
+
+    // Clamp for visual usability:
+    // Without clamping: Sun = ~33 GL units (fills entire screen)
+    // Without clamping: Moon = ~0.02 GL units (invisible)
+    return glm::clamp(r, 0.05f, 0.8f);  // Sun max = 0.8 instead of 1.5
 }
+
 
 /**
  * @brief Returns the current position of a body (in GL units) for the active
@@ -669,7 +705,7 @@ static bool initBodiesFromCSV(const std::string& path)
             }
 
             body.color  = colorForBody(name);   // still hardcoded for now — Phase 3 fixes this
-            body.radius = radiusForBody(name);  // still hardcoded for now — Phase 2 fixes this
+            body.radius = computeVisualRadius(body.mass);
             g_bodyIndex[name] = g_bodies.size();
             g_bodies.push_back(std::move(body));
             bodyCols.push_back({ix, iy, iz});
@@ -724,31 +760,10 @@ static bool initBodiesFromCSV(const std::string& path)
             glm::vec3 p(static_cast<float>(x * SCALE_METERS), static_cast<float>(y * SCALE_METERS),
                         static_cast<float>(z * SCALE_METERS));
 
-            // ----------------------------------------
-            // ✨ VISUAL DISTANCE COMPRESSION (2%)
-            // ----------------------------------------
-            // This keeps all orbital shapes and relative geometry,
-            // but pulls the whole system closer to the camera so
-            // Jupiter / Saturn / Uranus / Neptune are actually visible.
-            p *= DIST_VIS_SCALE;
+            
+            p *= g_distVisScale;
 
             framePos[bi] = p;
-        }
-
-        // Exaggerate Moon orbit if both Earth and Moon exist.
-        if (MOON_EXAGGERATION != 1.0f)
-        {
-            auto itEarth = g_bodyIndex.find("Earth");
-            auto itMoon = g_bodyIndex.find("Moon");
-            if (itEarth != g_bodyIndex.end() && itMoon != g_bodyIndex.end())
-            {
-                size_t eIdx = itEarth->second;
-                size_t mIdx = itMoon->second;
-                glm::vec3 earthPos = framePos[eIdx];
-                glm::vec3 moonPos = framePos[mIdx];
-                glm::vec3 offset = moonPos - earthPos;
-                framePos[mIdx] = earthPos + offset * MOON_EXAGGERATION;
-            }
         }
 
         // Append frame positions to each body.
