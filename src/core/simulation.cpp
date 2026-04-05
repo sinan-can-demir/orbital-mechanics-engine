@@ -300,31 +300,70 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     }
 
     // ============================
-    // Open main CSV file
+    // Auto-create output directory
+    // ============================
+    std::filesystem::path outPath(outputPath);
+    if (outPath.has_parent_path())
+        std::filesystem::create_directories(outPath.parent_path());
+
+    // ============================
+    // Open positions file (viewer reads this)
     // ============================
     std::ofstream file(outputPath);
-
     if (!file)
     {
         std::cerr << "❌ Could not open output file: " << outputPath << "\n";
         return;
     }
 
-    /**********************************************
-     * CSV HEADER (Generic for any N bodies)
-     **********************************************/
-    file << "step,";
-    for (const auto& b : bodies)
+    // ============================
+    // Open conservation file (Python reads this)
+    // ============================
+    std::string conservPath =
+        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
+
+    std::ofstream conservFile(conservPath);
+    if (!conservFile)
+        std::cerr << "⚠️ Could not open conservation file: " << conservPath << "\n";
+
+    // ============================
+    // Metadata comment — positions file only
+    // ============================
+    file << "# stride=" << stride << " dt=" << dt << " bodies=";
+    for (std::size_t i = 0; i < bodies.size(); ++i)
     {
-        file << "x_" << b.name << ","
-             << "y_" << b.name << ","
-             << "z_" << b.name << ",";
+        file << bodies[i].name << ":" << bodies[i].mass;
+        if (i + 1 < bodies.size())
+            file << ",";
+    }
+    file << "\n";
+
+    // ============================
+    // Positions header — no conservation columns
+    // ============================
+    file << "step";
+    for (const auto& b : bodies)
+        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
+    file << "\n";
+
+    // ============================
+    // Conservation header — separate file
+    // ============================
+    if (conservFile)
+    {
+        conservFile << "step"
+                    << ",E_total,KE,PE"
+                    << ",Lx,Ly,Lz,Lmag"
+                    << ",Px,Py,Pz,Pmag"
+                    << ",dE_rel,dL_rel,dP_rel"
+                    << "\n";
     }
 
-    file << "E_total,KE,PE,"
-         << "Lx,Ly,Lz,Lmag,"
-         << "Px,Py,Pz,Pmag,"
-         << "dE_rel,dL_rel,dP_rel\n";
+    // ============================
+    // Seed accelerations for leapfrog before the loop
+    // ============================
+    if (integrator == Integrator::Leapfrog)
+        updateAccelerations(bodies);
 
     // ============================
     // Seed accelerations for leapfrog before the loop
@@ -377,20 +416,28 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         // ============================
         // CSV ROW (main orbit data)
         // ============================
-        file << i << ",";
-
+        // Positions row
+        file << i;
         for (const auto& b : bodies)
-        {
-            file << b.position.x() << "," << b.position.y() << "," << b.position.z() << ",";
-        }
+            file << "," << b.position.x() << "," << b.position.y() << "," << b.position.z();
+        file << "\n";
 
-        file << C.total_energy << "," << C.kinetic_energy << "," << C.potential_energy << ","
-             << C.L[0] << "," << C.L[1] << "," << C.L[2] << "," << Lmag << "," << C.P[0] << ","
-             << C.P[1] << "," << C.P[2] << "," << Pmag << "," << dE << "," << dL << "," << dP
-             << "\n";
+        // Conservation row — write less frequently
+        if (conservFile && i % (stride * 10) == 0)
+        {
+            conservFile << i << "," << C.total_energy << "," << C.kinetic_energy << ","
+                        << C.potential_energy << "," << C.L[0] << "," << C.L[1] << "," << C.L[2]
+                        << "," << Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
+                        << Pmag << "," << dE << "," << dL << "," << dP << "\n";
+        }
     }
 
     file.close();
+    if (conservFile)
+        conservFile.close();
+
+    std::cout << "✅ Positions:     " << outputPath << "\n";
+    std::cout << "✅ Conservation:  " << conservPath << "\n";
     if (isSEM)
     {
         eclipseFile.close();

@@ -45,6 +45,9 @@ The engine is built to be:
 - `Makefile` — project automation and build targets
 - `CMakeLists.txt` — CMake build configuration
 
+For code organization and module boundary guidelines, see
+`docs/architecture.md`.
+
 ---
 
 ## 🛠 Requirements

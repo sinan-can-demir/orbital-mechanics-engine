@@ -1,55 +1,55 @@
 """
-File: angular_momentum_plot.py
-Author: Sinan Demir
-Date: 11/17/2025
-Purpose: Angular Momentum Plotter for Earth–Moon–Sun Simulation
-    Reads orbit_three_body.csv and plots:
-    - Total angular momentum magnitude |L| over time
-    - Relative angular momentum drift ΔL / L₀
+angular_momentum_plot.py
+------------------------
+Plots angular momentum conservation diagnostics for any simulation CSV.
+
+Usage:
+    python3 python/angular_momentum_plot.py
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
 
-#!/usr/bin/env python3
-import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
+from utils import pick_csv, load_csv, plot_conservation, plot_multi
 
-df = pd.read_csv("build/orbit_three_body.csv")
+# ── Load ──────────────────────────────────────────────────────────────────────
 
-# Extract logged angular momentum columns
-Lx = df["Lx"]
-Ly = df["Ly"]
-Lz = df["Lz"]
+data_file = pick_csv("Select conservation CSV:", conservation=True)
+df        = load_csv(data_file)
 
-# Magnitude
-L_mag = np.sqrt(Lx**2 + Ly**2 + Lz**2)
+out_dir = "results/conservation-graphs"
 
-# Drift relative to initial
-L0 = L_mag.iloc[0]
-dL_rel = (L_mag - L0) / L0
+# ── Plot 1: Angular momentum magnitude ────────────────────────────────────────
 
-path = "results/conservation-graphs/"
+plot_conservation(df,
+    y_col    = "Lmag",
+    title    = "Total Angular Momentum  |L|",
+    ylabel   = "|L|  (kg·m²/s)",
+    out_path = f"{out_dir}/angular_momentum.png",
+    color    = "#1f77b4"
+)
 
-# ---------- PLOT 1: |L|(t) ----------
-plt.figure(figsize=(10,5))
-plt.plot(df["step"], L_mag)
-plt.title("Total Angular Momentum |L| vs Time")
-plt.xlabel("Step")
-plt.ylabel("|L|  (kg·m²/s)")
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(f"{path}angular_momentum.png")
-plt.close()
+# ── Plot 2: Relative drift ────────────────────────────────────────────────────
 
-# ---------- PLOT 2: Relative drift ----------
-plt.figure(figsize=(10,5))
-plt.plot(df["step"], dL_rel)
-plt.title("Relative Angular Momentum Drift")    
-plt.xlabel("Step")
-plt.ylabel("ΔL / L₀")
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(f"{path}angular_momentum_drift.png")
-plt.close()
+plot_conservation(df,
+    y_col    = "dL_rel",
+    title    = "Relative Angular Momentum Drift  |ΔL / L₀|",
+    ylabel   = "ΔL / L₀",
+    out_path = f"{out_dir}/angular_momentum_drift.png",
+    color    = "#9467bd"
+)
 
-print(f"Saved: angular_momentum.png, angular_momentum_drift.png to {path}")
+# ── Plot 3: All three components ──────────────────────────────────────────────
+
+plot_multi(df,
+    series=[
+        ("Lx", "Lx", "#1f77b4"),
+        ("Ly", "Ly", "#ff7f0e"),
+        ("Lz", "Lz", "#2ca02c"),
+    ],
+    title    = "Angular Momentum Components",
+    ylabel   = "L  (kg·m²/s)",
+    out_path = f"{out_dir}/angular_momentum_components.png"
+)

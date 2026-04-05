@@ -45,29 +45,14 @@ static int g_windowHeight = 720;
 // Orbit camera spherical coords
 static float g_yaw = glm::radians(45.0f);
 static float g_pitch = glm::radians(20.0f);
-static float g_radius = 250.0f; // distance from target (in GL units)
+static float g_radius = 5.0f; // cam radius
 
 static bool g_mouseRotating = false;
 static double g_lastMouseX = 0.0;
 static double g_lastMouseY = 0.0;
 
-// Camera target selection
-enum class CameraTarget
-{
-    Barycenter = 0,
-    Sun,
-    Mercury,
-    Venus,
-    Earth,
-    Moon,
-    Mars,
-    Jupiter,
-    Saturn,
-    Uranus,
-    Neptune
-};
-
-static CameraTarget g_cameraTarget = CameraTarget::Barycenter;
+// Camera target selection (which body to orbit around)
+static int g_focusBodyIndex = -1; // -1 = barycenter/origin
 
 // Legend rendering objects (2D)
 static GLuint g_legendShader = 0;
@@ -83,6 +68,14 @@ static const float LEGEND_BASE_Y = 40.0f;  // from top
 static const float LEGEND_SPACING = 24.0f; // between rows
 static const float LEGEND_SIZE_PX = 14.0f; // base square size
 
+// -------------------------------------------------
+// Playback control
+// -------------------------------------------------
+static double g_lastTime = 0.0;
+static double g_simSpeed = 1440.0; // frames per real second
+static bool g_paused = false;
+static double g_accumulator = 0.0;
+
 // --------------------------------------------------
 // N-body rendering data
 // --------------------------------------------------
@@ -90,14 +83,24 @@ static const float LEGEND_SIZE_PX = 14.0f; // base square size
 struct BodyRenderInfo
 {
     std::string name;
+    double mass = 0.0;
     glm::vec3 color;
-    float radius;                     // visual radius in GL units
-    std::vector<glm::vec3> positions; // per-frame positions in GL units
+    float radius;
+    std::vector<glm::vec3> positions;
     SphereMesh mesh;
-
     GLuint orbitVAO = 0;
     GLuint orbitVBO = 0;
 };
+
+// ── CSV Metadata ─────────────────────────────────────────────────────────────
+struct CSVMetadata
+{
+    int stride = 1;
+    double dt = 3600.0;
+    std::unordered_map<std::string, double> masses; // name → kg
+};
+
+static CSVMetadata g_metadata;
 
 static std::vector<BodyRenderInfo> g_bodies;
 static std::unordered_map<std::string, size_t> g_bodyIndex;
@@ -181,53 +184,6 @@ static void scroll_callback(GLFWwindow*, double /*xoff*/, double yoff)
     float zoomSpeed = std::max(0.0000005f, g_radius * 0.1f);
     g_radius -= static_cast<float>(yoff) * zoomSpeed;
     g_radius = glm::clamp(g_radius, 0.00000001f, 100000.0f);
-}
-
-/**
- * @brief Keyboard controls:
- *  1 = Sun, 2 = Mercury, 3 = Venus, 4 = Earth, 5 = Moon,
- *  6 = Mars, 7 = Jupiter, 8 = Saturn, 9 = Uranus, 0 = Neptune
- */
-static void key_callback(GLFWwindow* /*win*/, int key, int /*scancode*/, int action, int /*mods*/)
-{
-    if (action != GLFW_PRESS)
-        return;
-
-    switch (key)
-    {
-    case GLFW_KEY_1:
-        g_cameraTarget = CameraTarget::Sun;
-        break;
-    case GLFW_KEY_2:
-        g_cameraTarget = CameraTarget::Mercury;
-        break;
-    case GLFW_KEY_3:
-        g_cameraTarget = CameraTarget::Venus;
-        break;
-    case GLFW_KEY_4:
-        g_cameraTarget = CameraTarget::Earth;
-        break;
-    case GLFW_KEY_5:
-        g_cameraTarget = CameraTarget::Moon;
-        break;
-    case GLFW_KEY_6:
-        g_cameraTarget = CameraTarget::Mars;
-        break;
-    case GLFW_KEY_7:
-        g_cameraTarget = CameraTarget::Jupiter;
-        break;
-    case GLFW_KEY_8:
-        g_cameraTarget = CameraTarget::Saturn;
-        break;
-    case GLFW_KEY_9:
-        g_cameraTarget = CameraTarget::Uranus;
-        break;
-    case GLFW_KEY_0:
-        g_cameraTarget = CameraTarget::Neptune;
-        break;
-    default:
-        break;
-    }
 }
 
 // --------------------------------------------------
@@ -375,46 +331,31 @@ static void drawLegendBox(float centerPx, float centerPy, float sizePx, const gl
 }
 
 /**
- * @brief Handle a left-click; if it lands on a legend box,
- *        update camera target (Sun/Earth/Moon).
+ * @brief Handles click events on the legend.
+ *
+ * @param mouseX
+ * @param mouseY
  */
 static void handleLegendClick(double mouseX, double mouseY)
 {
-    // Legend row centers in pixels
-    float centersY[3] = {LEGEND_BASE_Y, LEGEND_BASE_Y + LEGEND_SPACING,
-                         LEGEND_BASE_Y + 2.0f * LEGEND_SPACING};
+    float half = LEGEND_SIZE_PX * 0.5f;
 
-    float halfSize = LEGEND_SIZE_PX * 0.5f;
-    float x0 = LEGEND_BASE_X - halfSize;
-    float x1 = LEGEND_BASE_X + halfSize;
-
-    for (int i = 0; i < 3; ++i)
+    for (size_t i = 0; i < g_bodies.size(); ++i)
     {
-        float yCenter = centersY[i];
-        float y0 = yCenter - halfSize;
-        float y1 = yCenter + halfSize;
+        float y = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
 
-        if (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1)
+        if (mouseX >= LEGEND_BASE_X - half && mouseX <= LEGEND_BASE_X + half &&
+            mouseY >= y - half && mouseY <= y + half)
         {
-
-            switch (i)
-            {
-            case 0:
-                g_cameraTarget = CameraTarget::Sun;
-                break;
-            case 1:
-                g_cameraTarget = CameraTarget::Earth;
-                break;
-            case 2:
-                g_cameraTarget = CameraTarget::Moon;
-                break;
-            }
-
-            std::cout << "📌 Camera target set to "
-                      << (i == 0 ? "Sun" : (i == 1 ? "Earth" : "Moon")) << "\n";
+            g_focusBodyIndex = static_cast<int>(i);
+            std::cout << "📌 Focus: " << g_bodies[i].name << "\n";
             return;
         }
     }
+
+    // Click below all legend items → reset to barycenter
+    g_focusBodyIndex = -1;
+    std::cout << "📌 Focus: barycenter\n";
 }
 
 // --------------------------------------------------
@@ -423,70 +364,101 @@ static void handleLegendClick(double mouseX, double mouseY)
 
 // Distance scale: 1 GL unit = 5e9 meters
 static constexpr float DIST_SCALE_METERS = 1.0f / 5e9f;
+static float g_distVisScale = 1.0f; // computed after loading
 
-// Additional uniform compression for visualization.
-// After converting meters → GL, we multiply positions by this:
-// 1.0f  = no extra compression (true scale in GL)
-// 0.02f = 2% of that distance → outer planets pulled in so you can see them
-static constexpr float DIST_VIS_SCALE = 0.02f;
-
-// Moon orbit exaggeration (for visibility). Set to 1.0f for strict realism.
-static constexpr float MOON_EXAGGERATION = 15.0f;
-
-// Color map for Solar System bodies
-static glm::vec3 colorForBody(const std::string& name)
+/**
+ * @brief Computes a uniform distance scale factor to apply to all positions, so that
+ * the outermost orbit fits within a reasonable distance from the center. This is
+ * a purely visual scaling for better visibility of outer planets, and does not affect
+ * the relative geometry of orbits. The scale is computed based on the maximum raw distance
+ * found in the loaded data, and is applied uniformly to all positions.
+ *
+ * @param bodies
+ * @return float
+ */
+static float computeDistScale(const std::vector<BodyRenderInfo>& bodies)
 {
-    if (name == "Sun")
-        return {1.4f, 1.1f, 0.3f};
-    if (name == "Mercury")
-        return {0.7f, 0.7f, 0.7f};
-    if (name == "Venus")
-        return {1.0f, 0.9f, 0.6f};
-    if (name == "Earth")
-        return {0.2f, 0.8f, 1.2f};
-    if (name == "Moon")
-        return {0.85f, 0.85f, 0.92f};
-    if (name == "Mars")
-        return {0.9f, 0.3f, 0.2f};
-    if (name == "Jupiter")
-        return {1.0f, 0.7f, 0.4f};
-    if (name == "Saturn")
-        return {1.0f, 0.8f, 0.5f};
-    if (name == "Uranus")
-        return {0.5f, 0.8f, 1.0f};
-    if (name == "Neptune")
-        return {0.3f, 0.4f, 1.0f};
-    return {1.0f, 1.0f, 1.0f};
+    float maxDist = 0.0f;
+
+    for (const auto& body : bodies)
+    {
+        for (const auto& pos : body.positions)
+        {
+            // pos is already in GL units (after DIST_SCALE_METERS)
+            // but before vis compression — measure raw GL distance
+            maxDist = std::max(maxDist, glm::length(pos));
+        }
+    }
+
+    if (maxDist < 1e-9f)
+    {
+        std::cerr << "⚠️  computeDistScale: all positions near zero\n";
+        return 1.0f;
+    }
+
+    // Scale so the outermost orbit fits within TARGET_GL units from center
+    // TARGET_GL = 50 means the whole system fits in a 100-unit wide box
+    const float TARGET_GL = 50.0f;
+    float scale = TARGET_GL / maxDist;
+
+    std::cout << "🔭 Max orbital distance: " << maxDist << " GL units\n";
+    std::cout << "🔭 Dist scale computed:  " << scale << "\n";
+
+    return scale;
 }
 
-// Physical radii in meters → GL units (no exaggeration)
-static float radiusForBody(const std::string& name)
+/**
+ * @brief Computes a deterministic color for a body based on its name.
+ *
+ * @param name
+ * @return glm::vec3
+ */
+static glm::vec3 computeBodyColor(const std::string& name)
 {
-    float r_m = 6.0e6f; // default ~Earth-sized as fallback
+    // Hash the name → deterministic color
+    // Same name always produces same color across runs
+    // Works for any body name — no hardcoding needed
+    size_t hash = std::hash<std::string>{}(name);
 
-    if (name == "Sun")
-        r_m = 6.9634e8f;
-    else if (name == "Mercury")
-        r_m = 2.4397e6f;
-    else if (name == "Venus")
-        r_m = 6.0518e6f;
-    else if (name == "Earth")
-        r_m = 6.3710e6f;
-    else if (name == "Moon")
-        r_m = 1.7374e6f;
-    else if (name == "Mars")
-        r_m = 3.3895e6f;
-    else if (name == "Jupiter")
-        r_m = 6.9911e7f;
-    else if (name == "Saturn")
-        r_m = 5.8232e7f;
-    else if (name == "Uranus")
-        r_m = 2.5362e7f;
-    else if (name == "Neptune")
-        r_m = 2.4622e7f;
+    // Keep colors bright enough to see on dark background
+    // Lower bound 0.35 prevents dark/muddy colors
+    float r = 0.35f + 0.65f * ((hash & 0xFF) / 255.0f);
+    float g = 0.35f + 0.65f * (((hash >> 8) & 0xFF) / 255.0f);
+    float b = 0.35f + 0.65f * (((hash >> 16) & 0xFF) / 255.0f);
 
-    // meters → GL units (no extra radius exaggeration)
-    return r_m * DIST_SCALE_METERS;
+    return glm::vec3(r, g, b);
+}
+
+/**
+ * @brief Computes a visual radius for a body based on its mass, using Earth as a reference.
+ *
+ * @param mass
+ * @return float
+ */
+static float computeVisualRadius(double mass)
+{
+    // Reference: Earth mass → Earth visual size in GL units
+    // Every other body scales relative to this — no per-body hardcoding
+    const double M_EARTH = 5.9722e24;
+    const float R_EARTH_GL = 0.3f;
+
+    if (mass <= 0.0)
+    {
+        std::cerr << "⚠️  computeVisualRadius: no mass data, using fallback\n";
+        return 0.15f;
+    }
+
+    // Physical radius scales as cube root of mass
+    // R ∝ M^(1/3) — assumes roughly constant density across bodies
+    // Not perfectly accurate but gives correct relative ordering:
+    // Sun >> Jupiter >> Earth > Moon
+    double ratio = mass / M_EARTH;
+    float r = R_EARTH_GL * static_cast<float>(std::cbrt(ratio));
+
+    // Clamp for visual usability:
+    // Without clamping: Sun = ~33 GL units (fills entire screen)
+    // Without clamping: Moon = ~0.02 GL units (invisible)
+    return glm::clamp(r, 0.05f, 0.8f); // Sun max = 0.8 instead of 1.5
 }
 
 /**
@@ -505,6 +477,79 @@ static glm::vec3 getBodyPos(const std::string& name)
     size_t frame = (g_numFrames == 0) ? 0 : (g_frameIndex % g_numFrames);
     return g_bodies[idx].positions[frame];
 }
+
+// ── parseMetadataComment ─────────────────────────────────────────────────────
+/**
+ * @brief Parses the metadata comment line from a simulation CSV.
+ *
+ * Expected format:
+ *   # stride=1 dt=60 bodies=Sun:1.989e30,Earth:5.972e24,Moon:7.342e22
+ *
+ * All fields are optional — if missing, defaults in CSVMetadata are kept.
+ *
+ * @param line  The raw comment line (including the leading #)
+ * @param meta  Output metadata struct to fill
+ */
+static void parseMetadataComment(const std::string& line, CSVMetadata& meta)
+{
+    // ── stride ───────────────────────────────────────────────────────────────
+    auto stridePos = line.find("stride=");
+    if (stridePos != std::string::npos)
+    {
+        try
+        {
+            meta.stride = std::stoi(line.substr(stridePos + 7));
+        }
+        catch (...)
+        {
+        }
+    }
+
+    // ── dt ───────────────────────────────────────────────────────────────────
+    auto dtPos = line.find("dt=");
+    if (dtPos != std::string::npos)
+    {
+        try
+        {
+            meta.dt = std::stod(line.substr(dtPos + 3));
+        }
+        catch (...)
+        {
+        }
+    }
+
+    // ── bodies=Sun:1.989e30,Earth:5.972e24,... ───────────────────────────────
+    auto bodiesPos = line.find("bodies=");
+    if (bodiesPos == std::string::npos)
+        return;
+
+    std::string bodiesStr = line.substr(bodiesPos + 7);
+
+    // Split on commas → each token is "Name:mass"
+    std::stringstream ss(bodiesStr);
+    std::string token;
+    while (std::getline(ss, token, ','))
+    {
+        // Trim whitespace
+        token.erase(0, token.find_first_not_of(" \t\r\n"));
+        token.erase(token.find_last_not_of(" \t\r\n") + 1);
+
+        auto colonPos = token.find(':');
+        if (colonPos == std::string::npos)
+            continue;
+
+        std::string name = token.substr(0, colonPos);
+        std::string massStr = token.substr(colonPos + 1);
+
+        try
+        {
+            meta.masses[name] = std::stod(massStr);
+        }
+        catch (...)
+        {
+        }
+    }
+} // end parseMetadataComment
 
 /**
  * @brief Initialize N-body data by reading orbit_three_body.csv.
@@ -529,10 +574,31 @@ static bool initBodiesFromCSV(const std::string& path)
         return false;
     }
 
-    std::stringstream header(line);
+    // ── Check for metadata comment ────────────────────────────────────────────
+    if (line.rfind("# ", 0) == 0)
+    {
+        parseMetadataComment(line, g_metadata);
+
+        std::cout << "📊 Metadata:"
+                  << "  stride=" << g_metadata.stride << "  dt=" << g_metadata.dt << "s"
+                  << "  bodies=" << g_metadata.masses.size() << "\n";
+
+        for (const auto& [name, mass] : g_metadata.masses)
+            std::cout << "     " << name << " → " << mass << " kg\n";
+
+        // Advance to the actual column header line
+        if (!std::getline(file, line))
+        {
+            std::cerr << "⚠️ CSV has metadata but no column header\n";
+            return false;
+        }
+    }
+    // If no metadata comment, line already contains the column header so continue
+
     std::vector<std::string> columns;
     std::string col;
-    while (std::getline(header, col, ','))
+    std::stringstream ss(line);
+    while (std::getline(ss, col, ','))
     {
         columns.push_back(col);
     }
@@ -555,10 +621,23 @@ static bool initBodiesFromCSV(const std::string& path)
 
             BodyRenderInfo body;
             body.name = name;
-            body.color = colorForBody(name);
-            body.radius = radiusForBody(name);
+            body.mass = 0.0; // will be set from metadata if available
 
-            g_bodyIndex[name] = static_cast<size_t>(g_bodies.size());
+            // Look up mass from parsed metadata
+            auto massIt = g_metadata.masses.find(name);
+            if (massIt != g_metadata.masses.end())
+            {
+                body.mass = massIt->second;
+            }
+            else
+            {
+                std::cerr << "⚠️  No mass data for " << name
+                          << " — visual radius will use fallback\n";
+            }
+
+            body.color = computeBodyColor(name);
+            body.radius = computeVisualRadius(body.mass);
+            g_bodyIndex[name] = g_bodies.size();
             g_bodies.push_back(std::move(body));
             bodyCols.push_back({ix, iy, iz});
         }
@@ -612,31 +691,9 @@ static bool initBodiesFromCSV(const std::string& path)
             glm::vec3 p(static_cast<float>(x * SCALE_METERS), static_cast<float>(y * SCALE_METERS),
                         static_cast<float>(z * SCALE_METERS));
 
-            // ----------------------------------------
-            // ✨ VISUAL DISTANCE COMPRESSION (2%)
-            // ----------------------------------------
-            // This keeps all orbital shapes and relative geometry,
-            // but pulls the whole system closer to the camera so
-            // Jupiter / Saturn / Uranus / Neptune are actually visible.
-            p *= DIST_VIS_SCALE;
+            p *= g_distVisScale;
 
             framePos[bi] = p;
-        }
-
-        // Exaggerate Moon orbit if both Earth and Moon exist.
-        if (MOON_EXAGGERATION != 1.0f)
-        {
-            auto itEarth = g_bodyIndex.find("Earth");
-            auto itMoon = g_bodyIndex.find("Moon");
-            if (itEarth != g_bodyIndex.end() && itMoon != g_bodyIndex.end())
-            {
-                size_t eIdx = itEarth->second;
-                size_t mIdx = itMoon->second;
-                glm::vec3 earthPos = framePos[eIdx];
-                glm::vec3 moonPos = framePos[mIdx];
-                glm::vec3 offset = moonPos - earthPos;
-                framePos[mIdx] = earthPos + offset * MOON_EXAGGERATION;
-            }
         }
 
         // Append frame positions to each body.
@@ -707,6 +764,21 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    // ── Set default playback speed from metadata ──────────────────────────────
+    // Target: 1 simulated day per real second
+    // simSecondsPerFrame = stride × dt
+    // framesPerSimDay    = 86400 / simSecondsPerFrame
+    {
+        double simSecondsPerFrame = static_cast<double>(g_metadata.stride) * g_metadata.dt;
+        double framesPerSimDay = 86400.0 / simSecondsPerFrame;
+
+        // Clamp to a sane range — don't play at 0.001 fps or 100000 fps
+        g_simSpeed = glm::clamp(framesPerSimDay, 1.0, 10000.0);
+
+        std::cout << "⏱  Playback: 1 sim-day per real-second"
+                  << "  (" << g_simSpeed << " frames/s)\n";
+    }
+
     // ----------------- GLFW init -----------------
     if (!glfwInit())
     {
@@ -733,7 +805,6 @@ int main(int argc, char** argv)
     glfwSetMouseButtonCallback(win, mouse_button_callback);
     glfwSetCursorPosCallback(win, cursor_pos_callback);
     glfwSetScrollCallback(win, scroll_callback);
-    glfwSetKeyCallback(win, key_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -852,6 +923,8 @@ int main(int argc, char** argv)
     // ----------------------------------------------------
     initLegendRenderer();
 
+    buildOrbitBuffers();
+
     // ----------------------------------------------------
     // Main render loop
     // ----------------------------------------------------
@@ -859,9 +932,19 @@ int main(int argc, char** argv)
     {
         glfwPollEvents();
 
-        if (g_numFrames > 0)
+        double now = glfwGetTime();
+        double dtReal = now - g_lastTime;
+        g_lastTime = now;
+        dtReal = std::min(dtReal, 0.05);
+
+        if (!g_paused && g_numFrames > 0)
         {
-            g_frameIndex = (g_frameIndex + 1) % g_numFrames;
+            g_accumulator += dtReal * g_simSpeed;
+            while (g_accumulator >= 1.0)
+            {
+                g_frameIndex = (g_frameIndex + 1) % g_numFrames;
+                g_accumulator -= 1.0;
+            }
         }
 
         glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // deep navy space
@@ -869,44 +952,14 @@ int main(int argc, char** argv)
 
         if (!g_bodies.empty() && g_numFrames > 0)
         {
+
+            size_t frame = g_frameIndex % g_numFrames;
+
             // Determine camera target position
-            glm::vec3 target(0.0f);
-            switch (g_cameraTarget)
+            glm::vec3 target(0.0f); // default: barycenter
+            if (g_focusBodyIndex >= 0 && g_focusBodyIndex < static_cast<int>(g_bodies.size()))
             {
-            case CameraTarget::Sun:
-                target = getBodyPos("Sun");
-                break;
-            case CameraTarget::Mercury:
-                target = getBodyPos("Mercury");
-                break;
-            case CameraTarget::Venus:
-                target = getBodyPos("Venus");
-                break;
-            case CameraTarget::Earth:
-                target = getBodyPos("Earth");
-                break;
-            case CameraTarget::Moon:
-                target = getBodyPos("Moon");
-                break;
-            case CameraTarget::Mars:
-                target = getBodyPos("Mars");
-                break;
-            case CameraTarget::Jupiter:
-                target = getBodyPos("Jupiter");
-                break;
-            case CameraTarget::Saturn:
-                target = getBodyPos("Saturn");
-                break;
-            case CameraTarget::Uranus:
-                target = getBodyPos("Uranus");
-                break;
-            case CameraTarget::Neptune:
-                target = getBodyPos("Neptune");
-                break;
-            case CameraTarget::Barycenter:
-            default:
-                target = glm::vec3(0.0f);
-                break;
+                target = g_bodies[g_focusBodyIndex].positions[frame];
             }
 
             // Camera offset in local spherical coords
@@ -925,7 +978,6 @@ int main(int argc, char** argv)
             glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
 
             glm::mat4 vp = proj * view;
-            size_t frame = g_frameIndex % g_numFrames;
 
             // ---------------- Orbit line draw ----------------
             glEnable(GL_DEPTH_TEST);
@@ -986,22 +1038,14 @@ int main(int argc, char** argv)
         float size = LEGEND_SIZE_PX;
         float sizeSel = LEGEND_SIZE_PX * 1.4f; // highlight selected
 
-        float y0 = LEGEND_BASE_Y;
-        float y1 = LEGEND_BASE_Y + LEGEND_SPACING;
-        float y2 = LEGEND_BASE_Y + 2.0f * LEGEND_SPACING;
+        for (size_t i = 0; i < g_bodies.size(); ++i)
+        {
+            float y = LEGEND_BASE_Y + static_cast<float>(i) * LEGEND_SPACING;
+            bool selected = (g_focusBodyIndex == static_cast<int>(i));
+            float size = selected ? LEGEND_SIZE_PX * 1.4f : LEGEND_SIZE_PX;
 
-        // Sun icon (top)
-        drawLegendBox(LEGEND_BASE_X, y0, (g_cameraTarget == CameraTarget::Sun ? sizeSel : size),
-                      glm::vec3(1.4f, 1.1f, 0.3f));
-
-        // Earth icon (middle)
-        drawLegendBox(LEGEND_BASE_X, y1, (g_cameraTarget == CameraTarget::Earth ? sizeSel : size),
-                      glm::vec3(0.2f, 0.8f, 1.2f));
-
-        // Moon icon (bottom)
-        drawLegendBox(LEGEND_BASE_X, y2, (g_cameraTarget == CameraTarget::Moon ? sizeSel : size),
-                      glm::vec3(0.85f, 0.85f, 0.92f));
-
+            drawLegendBox(LEGEND_BASE_X, y, size, g_bodies[i].color);
+        }
         glEnable(GL_DEPTH_TEST);
 
         glfwSwapBuffers(win);
