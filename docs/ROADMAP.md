@@ -7,6 +7,9 @@
 **GitHub**: https://github.com/sinan-can-demir/orbital-mechanics-engine  
 **Target**: JOSS submission at v2.0
 
+For code organization rules and module boundary guidance, see
+`docs/architecture.md`.
+
 ---
 
 ## Current State (v1.2 — Post Visualization Refactor)

@@ -1,446 +1,630 @@
-# System Architecture and Design
+# Architecture and Codebase Design Guidelines
 
-*Comprehensive documentation of the software architecture, module organization, and design principles of the orbital dynamics simulation.*
+*Practical rules for keeping the orbital mechanics engine clean, extensible,
+and reviewable as the project grows.*
 
----
-
-## System Overview
-
-The orbital dynamics simulation is designed as a modular, extensible system with clear separation between the physics engine, data handling, and visualization components. The architecture follows a layered approach where high-level modules depend on well-defined interfaces to lower-level functionality.
-
-### Design Philosophy
-
-The system architecture emphasizes:
-- **Modularity**: Clear boundaries between physics, I/O, and visualization
-- **Extensibility**: Easy addition of new integrators, force models, and visualization features
-- **Performance**: Efficient data structures and algorithms for N-body computations
-- **Maintainability**: Well-documented interfaces and consistent coding patterns
-- **Testability**: Separation of concerns enables focused unit testing
-
-### Architectural Layers
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Application Layer                        │
-│  ┌─────────────────┐    ┌─────────────────┐                 │
-│  │   CLI Interface │    │ OpenGL Viewer   │                 │
-│  └─────────────────┘    └─────────────────┘                 │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│                    Service Layer                            │
-│  ┌─────────────────┐    ┌─────────────────┐                 │
-│  │ Data Ingestion  │    │  Configuration  │                 │
-│  │ (JSON/HORIZONS) │    │    Management   │                 │
-│  └─────────────────┘    └─────────────────┘                 │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│                     Core Layer                              │
-│  ┌─────────────────┐    ┌──────────────────┐                │
-│  │ Physics Engine  │    │ Numerical Methods│                │
-│  │   (N-body)      │    │    (RK4)         │                │
-│  └─────────────────┘    └──────────────────┘                │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│                    Foundation Layer                         │
-│  ┌─────────────────┐    ┌─────────────────┐                 │
-│  │   Math Library  │    │   Utilities     │                 │
-│  │  (Vectors, etc) │    │   (I/O, etc)    │                 │
-│  └─────────────────┘    └─────────────────┘                 │
-└─────────────────────────────────────────────────────────────┘
-```
+**Author**: Sinan Can Demir  
+**Last Updated**: April 2026
 
 ---
 
-## Core Simulation Engine
+## Why this document exists
 
-### Physics Module Organization
+This repository has grown beyond a single-file or single-feature student
+project. At this stage, code quality depends less on whether individual
+functions work and more on whether the structure stays coherent as new features
+arrive.
 
-The physics engine is organized around several key components:
+This document is a working reference for:
 
-#### CelestialBody Structure
+1. where code should live
+2. what each module is allowed to depend on
+3. how to add features without coupling everything together
+4. what "good structure" means for this codebase
+
+The goal is not abstract architecture purity. The goal is to make future work
+faster, safer, and easier to review.
+
+---
+
+## Design Principles
+
+These are the rules to preserve as the project evolves.
+
+### 1. Keep the simulation core independent
+
+The physics engine should not depend on:
+- CLI parsing
+- file naming conventions
+- terminal printing
+- OpenGL viewer logic
+- Python binding details
+
+If the core can run entirely in memory with no user interface attached, the
+architecture is in good shape.
+
+### 2. Separate computation from I/O
+
+A function that computes physics should not also decide:
+- where output files go
+- how CSV columns are formatted
+- what to print to stdout
+
+Good pattern:
+- core computes results
+- exporter writes results
+- CLI decides paths and user messages
+
+### 3. Prefer stable data models over ad hoc parameter lists
+
+When a function starts accumulating many unrelated parameters, replace them with
+an options or result struct.
+
+Good examples:
+- `SimulationOptions`
+- `SimulationResult`
+- `HorizonsState`
+
+This improves readability and makes Python bindings easier later.
+
+### 4. Dependency direction must stay one-way
+
+Higher-level layers may depend on lower-level layers.
+Lower-level layers must not depend on higher-level layers.
+
+Allowed direction:
+
+```text
+cli / viewer / python
+        ↓
+      io layer
+        ↓
+   simulation core
+        ↓
+  math + small utilities
+```
+
+Forbidden direction:
+- `src/core` including viewer headers
+- `src/core` depending on CLI argument parsing
+- `src/core` writing user-facing help text
+
+### 5. A new feature should fit into an existing boundary
+
+When adding a feature, ask:
+
+1. Is this core physics?
+2. Is this input/output?
+3. Is this user interface?
+4. Is this visualization?
+5. Is this analysis tooling?
+
+If the answer is mixed, the feature probably needs to be split into smaller
+parts.
+
+---
+
+## Current High-Level Structure
+
+The repository already has a useful separation:
+
+```text
+include/      public headers
+src/core/     physics and simulation logic
+src/io/       JSON, HORIZONS, validation, system writing
+src/cli/      command-line entry points and argument handling
+src/viewer/   OpenGL visualization
+python/       analysis and plotting scripts
+tests/        C++ tests
+docs/         roadmap, methods, validation, architecture notes
+systems/      input system definitions
+```
+
+This is a solid foundation. The next step is to enforce clearer rules within
+that structure.
+
+---
+
+## Target Layering Rules
+
+Use the following mental model when placing code.
+
+## Layer 1: Foundations
+
+Purpose:
+- small value types
+- math helpers
+- constants
+- low-level utilities that are not domain workflows
+
+Examples:
+- `vec3`
+- physical constants
+- small helper functions with no side effects
+
+Should not know about:
+- JSON
+- HORIZONS
+- CLI flags
+- OpenGL
+- notebooks
+
+## Layer 2: Core Simulation
+
+Purpose:
+- body state
+- force calculations
+- integrators
+- conservation diagnostics
+- eclipse calculations if treated as a simulation diagnostic
+
+Examples:
+- `simulation.cpp`
+- `conservations.cpp`
+- `barycenter.cpp`
+- `eclipse.cpp`
+
+Should depend only on:
+- foundations
+- data structures needed to describe simulation input/output
+
+Should not:
+- open files
+- decide output path names
+- print progress to terminal
+- parse command-line options
+
+## Layer 3: Data and Service Layer
+
+Purpose:
+- load systems from JSON
+- parse HORIZONS outputs
+- validate configuration files
+- write systems or exported results
+
+Examples:
+- `json_loader.cpp`
+- `horizons_parser.cpp`
+- `system_writer.cpp`
+- `validate.cpp`
+
+This layer translates between external formats and internal data models.
+
+## Layer 4: Interfaces
+
+Purpose:
+- CLI
+- viewer
+- future Python bindings
+
+Examples:
+- `src/cli/*`
+- `src/viewer/*`
+- future `src/python/*`
+
+This layer is allowed to:
+- parse arguments
+- open windows
+- print help text
+- choose output file names
+- convert exceptions into user-facing errors
+
+This layer should not implement physics rules directly.
+
+---
+
+## File Placement Guidelines
+
+Use these rules when deciding where new code belongs.
+
+### Put code in `src/core/` if it:
+- advances the simulation state
+- computes a physical quantity
+- implements an integrator
+- computes diagnostics from body states
+
+### Put code in `src/io/` if it:
+- reads or writes JSON, CSV, or text files
+- parses HORIZONS responses
+- validates external input
+- serializes simulation output
+
+### Put code in `src/cli/` if it:
+- parses argv
+- dispatches commands
+- prints usage/help/errors for command-line users
+
+### Put code in `src/viewer/` if it:
+- loads rendered trajectory data
+- builds meshes
+- manages camera/input/render state
+
+### Put code in `python/` if it:
+- is pure Python analysis or plotting support
+- is notebook helper logic
+- is not required to compile the C++ engine
+
+### Put code in `tests/` if it:
+- verifies behavior
+- reproduces a bug
+- locks down scientific or interface assumptions
+
+---
+
+## Public Header Rules
+
+Headers in `include/` should define stable interfaces, not leak implementation
+details unnecessarily.
+
+### Good header habits
+
+1. include only what is needed
+2. prefer forward declarations when practical
+3. expose data models and function declarations, not unrelated helpers
+4. keep headers focused on one module responsibility
+
+### Bad header habits
+
+1. including heavy headers everywhere by default
+2. mixing unrelated APIs in one header
+3. putting too much implementation in headers without need
+4. exposing viewer or CLI details through core headers
+
+### Naming guideline
+
+Prefer names that describe role, not temporary implementation history.
+
+Good:
+- `simulation_result.h`
+- `simulation_options.h`
+- `csv_exporter.h`
+- `integrators.h`
+
+Less good:
+- `utils.h` for unrelated domain logic
+- `main.h` for shared project-wide declarations
+
+If a file name becomes vague, split or rename it.
+
+---
+
+## Core API Guidelines
+
+The most important architectural improvement for this codebase is to make the
+core API usable without the CLI.
+
+### Preferred pattern
+
 ```cpp
-struct CelestialBody {
-    std::string name;
-    double mass;
-    vec3 position;
-    vec3 velocity;
-    vec3 acceleration;
-};
+SimulationOptions options;
+SimulationResult result = runSimulation(bodies, options);
+writeTrajectoryCSV(result, path);
 ```
 
-The `CelestialBody` structure serves as the fundamental data container for all gravitational bodies in the simulation. It maintains complete state information and supports efficient vectorized operations.
+### Avoid this pattern in new code
 
-#### Force Computation System
-- **Pairwise force calculation**: O(N²) algorithm for N-body interactions
-- **Vectorized operations**: Efficient use of SIMD-capable data structures
-- **Singular handling**: Special cases for close approaches and collision detection
-- **Thread safety**: Force computations are independent and parallelizable
-
-#### Integration Framework
-The integration system provides:
-- **Abstract integrator interface**: Pluggable numerical methods
-- **RK4 implementation**: Fourth-order Runge-Kutta with fixed time stepping
-- **State management**: Consistent handling of position and velocity updates
-- **Error monitoring**: Built-in conservation law tracking
-
-### Data Flow Architecture
-
-```
-Input Data → Validation → State Initialization → Force Computation
-     ↓                                                      ↓
-Configuration ← Time Integration ← Conservation Monitoring ← Output
-```
-
-The simulation follows a clear data pipeline where each stage has well-defined inputs and outputs, enabling debugging and performance optimization.
-
----
-
-## Data Input and Configuration
-
-### JSON Configuration System
-
-The system uses JSON files for defining orbital scenarios:
-
-#### Configuration Schema
-```json
-{
-  "name": "System Name",
-  "epoch": "Reference epoch",
-  "bodies": [
-    {
-      "name": "Body Name",
-      "mass": "mass in kg",
-      "position": [x, y, z],
-      "velocity": [vx, vy, vz]
-    }
-  ]
-}
-```
-
-#### Loading Pipeline
-1. **Schema validation**: Ensures JSON structure compliance
-2. **Unit conversion**: Handles different unit systems if needed
-3. **Consistency checks**: Validates physical reasonableness
-4. **State initialization**: Creates CelestialBody objects
-
-### HORIZONS Integration
-
-The NASA JPL HORIZONS integration provides:
-
-#### Data Retrieval
-- **HTTP-based queries**: RESTful API access to HORIZONS system
-- **Flexible time ranges**: Arbitrary start/stop times and step sizes
-- **Multiple reference frames**: Barycentric, heliocentric, geocentric
-- **Vector types**: Position, velocity, and physical quantities
-
-#### Data Processing
-- **Format parsing**: Handles HORIZONS text output format
-- **Unit standardization**: Converts to SI units consistently
-- **Interpolation**: Provides continuous data between discrete points
-- **Validation**: Cross-checks against known orbital elements
-
----
-
-## OpenGL Visualization Pipeline
-
-### Rendering Architecture
-
-The OpenGL viewer is designed as a separate executable that processes simulation output:
-
-#### Data Loading
 ```cpp
-class CSVLoader {
-    // Loads trajectory data from simulation output
-    // Parses time series of positions and velocities
-    // Handles multiple bodies and time steps
-};
+runSimulation(bodies, steps, dt, outputPath, integrator, stride);
 ```
 
-#### Rendering Components
-- **Sphere mesh generation**: Procedural planet rendering with configurable detail
-- **Shader system**: GLSL shaders for lighting and material effects
-- **Camera system**: Interactive 3D navigation with focus targeting
-- **Orbit trails**: Optional trajectory visualization
+Why:
+- it mixes simulation with export concerns
+- it makes Python bindings awkward
+- it makes testing harder
+- it encourages every new feature to add another flag to one giant function
 
-### Graphics Pipeline
+### Recommended core objects
 
-```
-CSV Data → Vertex Buffers → Vertex Shaders → Fragment Shaders → Framebuffer
-    ↓                                                      ↓
-Time Control → Transform Matrices → Lighting Model → Display Output
-```
+As the project matures, prefer introducing explicit types such as:
 
-#### Shader Architecture
-- **Vertex shaders**: Handle transformations and projections
-- **Fragment shaders**: Implement lighting and material properties
-- **Geometry shaders**: Optional procedural geometry generation
-- **Compute shaders**: Future GPU acceleration possibilities
+1. `SimulationOptions`
+2. `SimulationResult`
+3. `IntegratorConfig`
+4. `ExportOptions`
 
-### Performance Optimizations
-
-The viewer implements several performance strategies:
-- **Level-of-detail**: Adaptive mesh resolution based on distance
-- **Frustum culling**: Only render visible objects
-- **Batch rendering**: Minimize draw call overhead
-- **Memory management**: Efficient buffer usage and updates
+This gives the codebase a stable vocabulary.
 
 ---
 
-## CLI Interface Design
+## Data Ownership Guidelines
 
-### Command Architecture
+When results are shared across modules, ownership must be obvious.
 
-The command-line interface follows a hierarchical structure:
+### Preferred rule
 
-```
-orbit-sim <command> [options]
-```
+The code that creates a result object owns it until it hands it to another
+layer explicitly.
 
-#### Available Commands
-- **run**: Execute orbital simulation
-- **fetch**: Retrieve HORIZONS ephemerides
-- **validate**: Verify configuration files
-- **info**: Display system information
-- **list**: Show available configurations
+Example:
+- core creates `SimulationResult`
+- CLI may export it
+- Python bindings may expose views into it
 
-### Option Parsing
+### Important implication for Python
 
-The CLI uses a consistent option format:
-```bash
---option value          # Long options with values
---flag                  # Boolean flags
--h, --help             # Help information
-```
+If Python is going to receive NumPy views later, result buffers should be:
+- contiguous
+- stable in memory
+- owned by a dedicated result object
 
-#### Error Handling
-- **Validation**: Comprehensive argument checking
-- **User guidance**: Clear error messages and usage hints
-- **Graceful failures**: Safe termination with informative output
+That means flattened arrays are often better than nested vectors for
+Python-facing output.
 
 ---
 
-## Module Interactions
+## Directory-Level Guidelines for Future Growth
 
-### Inter-Module Communication
+If the project grows, use this target organization.
 
-The system uses well-defined interfaces for module communication:
+```text
+include/
+  core/
+  io/
+  viewer/
+  python/
 
-#### Core Interfaces
-```cpp
-// Physics engine interface
-class IIntegrator {
-    virtual void step(std::vector<CelestialBody>& bodies, double dt) = 0;
-};
-
-// Data loading interface
-class IConfigLoader {
-    virtual std::vector<CelestialBody> load(const std::string& path) = 0;
-};
+src/
+  core/
+  io/
+  cli/
+  viewer/
+  python/
 ```
 
-#### Data Exchange
-- **Pass-by-reference**: Efficient data sharing between modules
-- **Const correctness**: Prevents unintended data modification
-- **Exception safety**: Robust error handling across module boundaries
+You do not need to do this reorganization immediately, but keep it in mind if
+the root `include/` directory becomes crowded.
 
-### Dependency Management
+### Suggested future additions
 
-The module dependency graph is acyclic and minimal:
+If Phase 3 lands:
 
+```text
+include/core/simulation_options.h
+include/core/simulation_result.h
+include/io/csv_exporter.h
+src/python/module.cpp
+src/python/py_simulation.cpp
+src/python/py_result.cpp
 ```
-CLI → Core → Foundation
-Viewer → Core → Foundation
-IO → Core → Foundation
+
+If the number of integrators grows:
+
+```text
+include/core/integrators.h
+src/core/integrators/
+  rk4.cpp
+  leapfrog.cpp
+  rk45.cpp
 ```
 
-This design ensures:
-- **Clear separation**: Each module has a specific responsibility
-- **Testability**: Modules can be tested in isolation
-- **Reusability**: Core components can be used in different contexts
+If diagnostics grow:
+
+```text
+include/core/diagnostics.h
+src/core/diagnostics/
+  conservation.cpp
+  eclipse.cpp
+  residuals.cpp
+```
+
+The point is not to over-engineer now. The point is to have a direction ready
+before the current files become overloaded.
 
 ---
 
-## Performance Architecture
+## Adding a New Feature: Decision Checklist
 
-### Computational Efficiency
+Before writing code, answer these questions:
 
-The simulation implements several performance optimizations:
+### 1. What layer does this belong to?
 
-#### Force Calculation
-- **Vectorization**: SIMD operations for position and velocity computations
-- **Memory locality**: Data structures optimized for cache performance
-- **Parallelization**: Thread-safe force computations for future GPU acceleration
+Pick one primary layer:
+- core
+- io
+- cli
+- viewer
+- python
 
-#### Integration
-- **In-place updates**: Minimize memory allocations during integration
-- **Efficient algorithms**: Optimized RK4 implementation with reduced temporary storage
-- **Adaptive capabilities**: Framework for future adaptive step sizing
+If the answer is two or more layers, split the task.
 
-### Memory Management
+### 2. What is the public interface?
 
-#### Allocation Strategies
-- **Stack allocation**: Prefer stack for temporary objects
-- **Pool allocation**: Reuse memory for frequently created/destroyed objects
-- **Smart pointers**: RAII for automatic resource management
+Define:
+- input type
+- output type
+- ownership
+- failure mode
 
-#### Data Structures
-- **Contiguous storage**: Vectors for cache-friendly access patterns
-- **Structure of arrays**: Optimized layout for vectorized operations
-- **Minimal indirection**: Direct access patterns for performance
+If you cannot state those clearly, the design is not ready.
 
----
+### 3. What should be tested?
 
-## Extensibility Framework
+Every nontrivial feature should add at least one of:
+- unit test
+- regression test
+- validation artifact
 
-### Plugin Architecture
+### 4. What documentation must change?
 
-The system supports extension through several mechanisms:
+Usually one of:
+- README
+- CLI reference
+- roadmap
+- methods or validation docs
 
-#### Integrator Plugins
-```cpp
-class RK45Integrator : public IIntegrator {
-    // Adaptive step size implementation
-};
+### 5. Does this increase coupling?
 
-class SymplecticIntegrator : public IIntegrator {
-    // Energy-conserving integration
-};
-```
+Warning signs:
+- core now needs to know about paths or terminal output
+- one feature requires touching many unrelated files
+- new code reuses a vague helper because there is no clean abstraction
 
-#### Force Model Extensions
-- **Relativistic corrections**: Post-Newtonian terms
-- **Non-gravitational forces**: Solar radiation pressure, drag
-- **Perturbation models**: J2, J3, higher-order harmonics
-
-### Configuration Extensions
-
-The JSON schema supports additional parameters:
-```json
-{
-  "integrator": "RK45",
-  "perturbations": {
-    "J2": true,
-    "solar_pressure": true
-  },
-  "output": {
-    "conservation": true,
-    "eclipse_detection": true
-  }
-}
-```
+If coupling increases, stop and refactor before continuing.
 
 ---
 
-## Build System Architecture
+## Code Smells to Watch For
 
-### CMake Organization
+These are the main structural warning signs in this repository.
 
-The build system uses CMake with clear target separation:
+### 1. "God functions"
 
-#### Library Targets
-- **orbit_core**: Physics engine and numerical methods
-- **glad**: OpenGL loading library
-- **External dependencies**: GLFW, GLM, libcurl
+A single function that:
+- loads data
+- runs physics
+- writes files
+- prints logs
+- handles special cases
 
-#### Executable Targets
-- **orbit-sim**: Command-line simulation tool
-- **orbit-viewer**: OpenGL visualization application
+This is the clearest sign a boundary needs to be split.
 
-### Dependency Management
+### 2. "God headers"
 
-#### System Dependencies
-- **OpenGL**: Graphics rendering
-- **GLFW**: Window management and input
-- **GLM**: Mathematics library for 3D graphics
-- **libcurl**: HTTP client for HORIZONS access
+Headers that become dumping grounds for unrelated declarations.
 
-#### Build Requirements
-- **C++17**: Modern language features for performance and expressiveness
-- **CMake 3.14+**: Build system configuration
-- **OpenGL 3.3+**: Minimum graphics capability
+Examples to watch:
+- overly broad utility headers
+- shared headers with no single responsibility
 
----
+### 3. Feature flags that leak across layers
 
-## Testing and Validation Architecture
+If a new CLI flag forces changes deep into unrelated modules, the interface is
+probably too weak or too entangled.
 
-### Unit Testing Framework
+### 4. Duplicate logic in CLI and Python tools
 
-The system is designed for comprehensive testing:
+If Python scripts reimplement logic the C++ core already knows, move the logic
+into a shared layer instead.
 
-#### Test Organization
-```
-tests/
-├── core/
-│   ├── test_integration.cpp
-│   ├── test_conservation.cpp
-│   └── test_forces.cpp
-├── io/
-│   ├── test_json_loader.cpp
-│   └── test_horizons.cpp
-└── viewer/
-    └── test_rendering.cpp
-```
+### 5. Vague names
 
-#### Validation Strategy
-- **Analytical solutions**: Two-body problem verification
-- **Conservation laws**: Energy and momentum monitoring
-- **Ephemeris comparison**: Real-world data validation
-- **Regression testing**: Continuous integration support
+Names like `utils`, `main`, `helper`, `manager`, or `processor` are acceptable
+only when the scope is genuinely small and obvious.
+
+If a file becomes important, rename it to reflect what it actually owns.
 
 ---
 
-## Future Architectural Extensions
+## Testing Structure Guidelines
 
-### Planned Enhancements
+A better structure is not only about production code. Tests should mirror the
+architecture.
 
-The architecture supports several future improvements:
+### Test categories to aim for
 
-#### Performance
-- **GPU acceleration**: CUDA/OpenCL integration for force calculations
-- **Parallel algorithms**: Barnes-Hut tree for large N systems
-- **Adaptive mesh refinement**: Dynamic resolution in visualization
+#### Core physics tests
+- force symmetry
+- integrator behavior
+- conservation properties
+- barycenter normalization
 
-#### Capabilities
-- **Web interface**: Browser-based visualization and control
-- **Real-time integration**: Live data streaming and visualization
-- **Machine learning**: Surrogate models for rapid approximation
+#### I/O tests
+- JSON load/validation
+- HORIZONS parse behavior
+- system writer round-trip
 
-#### Integration
-- **Database support**: Persistent storage for large simulations
-- **Cloud deployment**: Distributed computing capabilities
-- **API services**: RESTful interface for external applications
+#### Interface tests
+- CLI smoke tests
+- future Python API tests
+
+#### Validation tests
+- known orbit behavior
+- HORIZONS residual benchmarks
+
+### Testing rule
+
+When a bug is fixed, add the narrowest possible test that would have caught it.
+
+That is how the test suite becomes a memory of the project instead of a demo.
+
+---
+
+## Documentation Structure Guidelines
+
+Docs should also have roles.
+
+### Recommended split
+
+- `README.md`
+  brief install, build, run, quick examples
+
+- `docs/physics-and-methods.md`
+  scientific and numerical explanation
+
+- `docs/architecture.md`
+  structure rules and module boundaries
+
+- `docs/validation.md`
+  evidence that the numerics behave as claimed
+
+- `docs/milestones/*.md`
+  implementation plans for future changes
+
+### Documentation rule
+
+Do not let roadmap documents become the only place where architecture decisions
+exist. Once a design choice becomes permanent, move it into stable docs.
 
 ---
 
-## Design Patterns and Principles
+## Recommended Refactors Over Time
 
-### Applied Patterns
+These are the highest-value structural improvements for this codebase.
 
-The system incorporates several established design patterns:
+### Near-term
 
-#### Strategy Pattern
-- **Integrator selection**: Pluggable numerical methods
-- **Force models**: Configurable physics implementations
-- **Rendering modes**: Multiple visualization approaches
+1. introduce `SimulationOptions`
+2. introduce `SimulationResult`
+3. split file export out of the simulation loop
+4. reduce reliance on vague shared headers
+5. make tests run through `ctest`
 
-#### Factory Pattern
-- **Body creation**: Consistent object instantiation
-- **Loader selection**: Automatic format detection
-- **Shader compilation**: Runtime graphics pipeline setup
+### Mid-term
 
-#### Observer Pattern
-- **Progress monitoring**: Simulation status updates
-- **Event handling**: User interaction responses
-- **Data logging**: Automatic output generation
+1. move integrators behind cleaner interfaces
+2. separate diagnostics from stepping logic more clearly
+3. add Python bindings on top of the refactored core
+4. add CSV/export helpers as explicit I/O modules
 
-### Software Principles
+### Long-term
 
-The architecture follows key software engineering principles:
-
-- **Single Responsibility**: Each module has one clear purpose
-- **Open/Closed**: Open for extension, closed for modification
-- **Dependency Inversion**: Depend on abstractions, not concretions
-- **Interface Segregation**: Small, focused interfaces
-- **Don't Repeat Yourself**: Shared utilities and common code
+1. organize headers by subsystem
+2. standardize error handling strategy
+3. introduce more explicit API boundaries for library use
 
 ---
+
+## A Simple Standard for "Good Structure"
+
+When evaluating a change, use this standard:
+
+The codebase structure is improving if:
+
+1. the core becomes easier to reuse
+2. the interfaces become easier to explain
+3. a feature can be tested without spinning up unrelated systems
+4. the dependency graph becomes clearer, not blurrier
+5. new contributors can guess where code belongs
+
+The codebase structure is getting worse if:
+
+1. more logic collects in a few large files
+2. new features require edits across unrelated subsystems
+3. file I/O and physics keep blending together
+4. naming becomes less precise
+5. docs describe a cleaner structure than the code actually has
+
+---
+
+## Final Guideline
+
+Do not chase "enterprise architecture." Chase clean boundaries.
+
+For this project, a strong codebase is one where:
+- the simulation core can be reused by CLI, viewer, and Python
+- I/O is explicit and isolated
+- tests mirror real responsibilities
+- file names and headers describe what they actually own
+- new features make the design clearer instead of noisier
+
+That is the standard worth building toward.
