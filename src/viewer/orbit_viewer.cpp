@@ -83,6 +83,14 @@ static const float LEGEND_BASE_Y = 40.0f;  // from top
 static const float LEGEND_SPACING = 24.0f; // between rows
 static const float LEGEND_SIZE_PX = 14.0f; // base square size
 
+// -------------------------------------------------
+// Playback control
+// -------------------------------------------------
+static double g_lastTime    = 0.0;
+static double g_simSpeed    = 1440.0;  // frames per real second
+static bool   g_paused      = false;
+static double g_accumulator = 0.0;
+
 // --------------------------------------------------
 // N-body rendering data
 // --------------------------------------------------
@@ -90,14 +98,24 @@ static const float LEGEND_SIZE_PX = 14.0f; // base square size
 struct BodyRenderInfo
 {
     std::string name;
-    glm::vec3 color;
-    float radius;                     // visual radius in GL units
-    std::vector<glm::vec3> positions; // per-frame positions in GL units
-    SphereMesh mesh;
-
+    double      mass = 0.0;
+    glm::vec3   color;
+    float       radius;
+    std::vector<glm::vec3> positions;
+    SphereMesh  mesh;
     GLuint orbitVAO = 0;
     GLuint orbitVBO = 0;
 };
+
+// ── CSV Metadata ─────────────────────────────────────────────────────────────
+struct CSVMetadata
+{
+    int    stride = 1;
+    double dt     = 3600.0;
+    std::unordered_map<std::string, double> masses; // name → kg
+};
+
+static CSVMetadata g_metadata;
 
 static std::vector<BodyRenderInfo> g_bodies;
 static std::unordered_map<std::string, size_t> g_bodyIndex;
@@ -506,6 +524,64 @@ static glm::vec3 getBodyPos(const std::string& name)
     return g_bodies[idx].positions[frame];
 }
 
+// ── parseMetadataComment ─────────────────────────────────────────────────────
+/**
+ * @brief Parses the metadata comment line from a simulation CSV.
+ *
+ * Expected format:
+ *   # stride=1 dt=60 bodies=Sun:1.989e30,Earth:5.972e24,Moon:7.342e22
+ *
+ * All fields are optional — if missing, defaults in CSVMetadata are kept.
+ *
+ * @param line  The raw comment line (including the leading #)
+ * @param meta  Output metadata struct to fill
+ */
+static void parseMetadataComment(const std::string& line, CSVMetadata& meta)
+{
+    // ── stride ───────────────────────────────────────────────────────────────
+    auto stridePos = line.find("stride=");
+    if (stridePos != std::string::npos)
+    {
+        try { meta.stride = std::stoi(line.substr(stridePos + 7)); }
+        catch (...) {}
+    }
+
+    // ── dt ───────────────────────────────────────────────────────────────────
+    auto dtPos = line.find("dt=");
+    if (dtPos != std::string::npos)
+    {
+        try { meta.dt = std::stod(line.substr(dtPos + 3)); }
+        catch (...) {}
+    }
+
+    // ── bodies=Sun:1.989e30,Earth:5.972e24,... ───────────────────────────────
+    auto bodiesPos = line.find("bodies=");
+    if (bodiesPos == std::string::npos)
+        return;
+
+    std::string bodiesStr = line.substr(bodiesPos + 7);
+
+    // Split on commas → each token is "Name:mass"
+    std::stringstream ss(bodiesStr);
+    std::string token;
+    while (std::getline(ss, token, ','))
+    {
+        // Trim whitespace
+        token.erase(0, token.find_first_not_of(" \t\r\n"));
+        token.erase(token.find_last_not_of(" \t\r\n") + 1);
+
+        auto colonPos = token.find(':');
+        if (colonPos == std::string::npos)
+            continue;
+
+        std::string name    = token.substr(0, colonPos);
+        std::string massStr = token.substr(colonPos + 1);
+
+        try { meta.masses[name] = std::stod(massStr); }
+        catch (...) {}
+    }
+} // end parseMetadataComment
+
 /**
  * @brief Initialize N-body data by reading orbit_three_body.csv.
  *        - Detects all x_, y_, z_ position columns
@@ -529,10 +605,33 @@ static bool initBodiesFromCSV(const std::string& path)
         return false;
     }
 
-    std::stringstream header(line);
+    // ── Check for metadata comment ────────────────────────────────────────────
+    if (line.rfind("# ", 0) == 0)
+    {
+        parseMetadataComment(line, g_metadata);
+
+        std::cout << "📊 Metadata:"
+                  << "  stride=" << g_metadata.stride
+                  << "  dt="     << g_metadata.dt     << "s"
+                  << "  bodies=" << g_metadata.masses.size()
+                  << "\n";
+
+        for (const auto& [name, mass] : g_metadata.masses)
+            std::cout << "     " << name << " → " << mass << " kg\n";
+
+        // Advance to the actual column header line
+        if (!std::getline(file, line))
+        {
+            std::cerr << "⚠️ CSV has metadata but no column header\n";
+            return false;
+        }
+    }
+    // If no metadata comment, line already contains the column header so continue
+    
     std::vector<std::string> columns;
     std::string col;
-    while (std::getline(header, col, ','))
+    std::stringstream ss(line);
+    while (std::getline(ss, col, ','))
     {
         columns.push_back(col);
     }
@@ -554,11 +653,24 @@ static bool initBodiesFromCSV(const std::string& path)
             int iz = static_cast<int>(i + 2);
 
             BodyRenderInfo body;
-            body.name = name;
-            body.color = colorForBody(name);
-            body.radius = radiusForBody(name);
+            body.name  = name;
+            body.mass  = 0.0;   // will be set from metadata if available
 
-            g_bodyIndex[name] = static_cast<size_t>(g_bodies.size());
+            // Look up mass from parsed metadata
+            auto massIt = g_metadata.masses.find(name);
+            if (massIt != g_metadata.masses.end())
+            {
+                body.mass = massIt->second;
+            }
+            else
+            {
+                std::cerr << "⚠️  No mass data for " << name
+                          << " — visual radius will use fallback\n";
+            }
+
+            body.color  = colorForBody(name);   // still hardcoded for now — Phase 3 fixes this
+            body.radius = radiusForBody(name);  // still hardcoded for now — Phase 2 fixes this
+            g_bodyIndex[name] = g_bodies.size();
             g_bodies.push_back(std::move(body));
             bodyCols.push_back({ix, iy, iz});
         }
@@ -705,6 +817,21 @@ int main(int argc, char** argv)
     if (!initBodiesFromCSV(csvPath))
     {
         return -1;
+    }
+
+    // ── Set default playback speed from metadata ──────────────────────────────
+    // Target: 1 simulated day per real second
+    // simSecondsPerFrame = stride × dt
+    // framesPerSimDay    = 86400 / simSecondsPerFrame
+    {
+        double simSecondsPerFrame = static_cast<double>(g_metadata.stride) * g_metadata.dt;
+        double framesPerSimDay    = 86400.0 / simSecondsPerFrame;
+
+        // Clamp to a sane range — don't play at 0.001 fps or 100000 fps
+        g_simSpeed = glm::clamp(framesPerSimDay, 1.0, 10000.0);
+
+        std::cout << "⏱  Playback: 1 sim-day per real-second"
+                  << "  (" << g_simSpeed << " frames/s)\n";
     }
 
     // ----------------- GLFW init -----------------
