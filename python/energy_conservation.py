@@ -14,7 +14,7 @@ Purpose: Energy Conservation Plotter for N-Body Simulation
 from utils import pick_csv, plot_multi, plot_conservation
 import pandas as pd
 
-data_file = pick_csv("Select simulation CSV:")
+data_file = pick_csv("Select conservation CSV:", conservation=True)
 df = pd.read_csv(data_file, comment='#')
 
 # Energy components

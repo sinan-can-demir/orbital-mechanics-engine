@@ -16,7 +16,7 @@ from utils import pick_csv, load_csv, plot_conservation, plot_multi
 
 # ── Load ──────────────────────────────────────────────────────────────────────
 
-data_file = pick_csv("Select simulation CSV to analyze:")
+data_file = pick_csv("Select conservation CSV:", conservation=True)
 df        = load_csv(data_file)
 
 out_dir = "results/conservation-graphs"

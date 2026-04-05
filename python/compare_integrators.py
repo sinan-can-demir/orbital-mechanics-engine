@@ -21,12 +21,12 @@ from utils import pick_csv, load_csv, get_x_axis
 # ── Load ──────────────────────────────────────────────────────────────────────
 
 print("Select the FIRST integrator results (e.g. RK4):")
-path_a = pick_csv("First CSV:")
+path_a = pick_csv("First CSV (conservation):", conservation=True)
 df_a   = load_csv(path_a)
 label_a = os.path.basename(path_a).replace(".csv", "")
 
 print("Select the SECOND integrator results (e.g. Leapfrog):")
-path_b = pick_csv("Second CSV:")
+path_b = pick_csv("Second CSV (conservation):", conservation=True)
 df_b   = load_csv(path_b)
 label_b = os.path.basename(path_b).replace(".csv", "")
 

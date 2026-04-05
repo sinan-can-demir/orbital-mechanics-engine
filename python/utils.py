@@ -22,33 +22,40 @@ import pandas as pd
 
 # ── File Picker ───────────────────────────────────────────────────────────────
 
-def pick_csv(prompt: str) -> str:
+def pick_csv(prompt: str, conservation: bool = False) -> str:
     """
-    Interactively pick a CSV file from results/.
-    Filters out eclipse logs and other non-simulation files.
-
+    Pick a CSV from results/.
+    
     Args:
-        prompt: Message shown to the user above the file list.
-
-    Returns:
-        Path to the selected CSV file.
+        conservation: if True, show _conservation.csv files
+                      if False, show position files only
     """
-    files = sorted(glob.glob("results/**/*.csv", recursive=True)
-                   + glob.glob("results/*.csv"))
+    all_files = sorted(glob.glob("results/**/*.csv", recursive=True)
+                      + glob.glob("results/*.csv"))
 
-    # Deduplicate and filter noise
     seen = set()
     filtered = []
-    for f in files:
+    for f in all_files:
         if f in seen:
             continue
         seen.add(f)
+
+        # Always skip eclipse logs
         if "_eclipse" in f:
             continue
+
+        # Filter based on what caller wants
+        is_conservation = "_conservation" in f
+        if conservation and not is_conservation:
+            continue
+        if not conservation and is_conservation:
+            continue
+
         filtered.append(f)
 
     if not filtered:
-        print("❌ No CSV files found in results/")
+        kind = "conservation" if conservation else "position"
+        print(f"❌ No {kind} CSV files found in results/")
         sys.exit(1)
 
     print(f"\n{prompt}")
