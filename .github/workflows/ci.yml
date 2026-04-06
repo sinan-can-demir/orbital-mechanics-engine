@@ -77,23 +77,27 @@ jobs:
         run: ./build/bin/orbit-sim --help
 
   test:
-    needs: lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-
-      - name: Configure CMake
-        run: cmake -S . -B build -DBUILD_VIEWER=OFF
-
-      - name: Build
-        run: cmake --build build --parallel
-
-      - name: Validate system file
-        run: ./build/bin/orbit-sim validate --system systems/earth_moon.json
-
-      - name: Run test simulation
-        run: ./build/bin/orbit-sim run --system systems/earth_moon.json --steps 100 --dt 3600 --output results/test_out.csv
+      needs: lint
+      runs-on: ubuntu-latest
+  
+      steps:
+        - uses: actions/checkout@v4
+      
+        - name: Install dependencies
+          run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      
+        - name: Configure CMake
+          run: cmake -S . -B build -DBUILD_VIEWER=OFF
+      
+        - name: Build
+          run: cmake --build build --parallel
+      
+        - name: Validate system file
+          run: ./build/bin/orbit-sim validate --system systems/earth_moon.json
+      
+        - name: Run test simulation
+          run: ./build/bin/orbit-sim run --system systems/earth_moon.json --steps 100 --dt 3600 --output results/test_out.csv
+      
+        - name: Run test suite
+          run: ctest --output-on-failure
+          working-directory: build
