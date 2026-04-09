@@ -56,7 +56,7 @@ Track these as hard requirements. Do not submit until all are green.
 | Open source license (MIT) | ✅ Done | — |
 | Substantial functionality | ✅ Done | — |
 | Community guidelines (CONTRIBUTING.md) | ✅ Done | — |
-| Passing test suite (`ctest`) | ⚠️ Partial | 1, 2, 3 |
+| Passing test suite (`ctest`) | ✅ Done | — |
 | HORIZONS validation study | ❌ Missing | 2 |
 | Python API (pybind11) | ❌ Missing | 3 |
 | Jupyter notebook examples | ❌ Missing | 3 |

@@ -148,3 +148,54 @@ target_link_libraries(test_system_writer PRIVATE orbit_core)
 target_include_directories(test_system_writer PRIVATE
     ${PROJECT_SOURCE_DIR}/include
 )
+
+enable_testing()
+
+# ── Register existing tests ──────────────────────────────────────────────────
+add_test(NAME conservation
+    COMMAND test_conservation
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(NAME horizons_parser
+    COMMAND test_horizons_parser
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(NAME system_writer
+    COMMAND test_system_writer
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# ── New test executables ─────────────────────────────────────────────────────
+add_executable(test_two_body tests/test_two_body.cpp)
+target_link_libraries(test_two_body PRIVATE orbit_core)
+target_include_directories(test_two_body PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME two_body
+    COMMAND test_two_body
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(test_barycenter tests/test_barycenter.cpp)
+target_link_libraries(test_barycenter PRIVATE orbit_core)
+target_include_directories(test_barycenter PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME barycenter
+    COMMAND test_barycenter
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(test_leapfrog tests/test_leapfrog.cpp)
+target_link_libraries(test_leapfrog PRIVATE orbit_core)
+target_include_directories(test_leapfrog PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME leapfrog
+    COMMAND test_leapfrog
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(test_cli tests/test_cli.cpp)
+target_link_libraries(test_cli PRIVATE orbit_core)
+target_include_directories(test_cli PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME cli_smoke
+    COMMAND test_cli
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)

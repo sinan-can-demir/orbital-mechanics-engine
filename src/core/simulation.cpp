@@ -366,12 +366,6 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         updateAccelerations(bodies);
 
     // ============================
-    // Seed accelerations for leapfrog before the loop
-    // ============================
-    if (integrator == Integrator::Leapfrog)
-        updateAccelerations(bodies);
-
-    // ============================
     // Main Integration Loop
     // ============================
     for (int i = 0; i < steps; ++i)
