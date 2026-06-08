@@ -71,6 +71,20 @@ struct ConservationSnapshot
     double Pmag;  // linear momentum magnitude
 };
 
+struct SimulationSnapshot
+{
+    int step;
+    double time_s;
+    double dt_used;
+    std::vector<vec3> positions;
+    ConservationSnapshot conservation;
+};
+
+struct SimulationResult{
+    std::vector<std::string> body_names;
+    std::vector<SimulationSnapshot> snapshots;
+};
+
 ConservationSnapshot computeSnapshot(const physics::Conservations& C,
                                      double E0, double L0, double P0);
 
