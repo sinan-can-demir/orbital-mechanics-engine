@@ -370,6 +370,11 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     // ============================
     // Main Integration Loop
     // ============================
+    SimulationResult result;
+    result.body_names.reserve(bodies.size());
+    for (const auto& b : bodies)
+        result.body_names.push_back(b.name);
+
     for (int i = 0; i < steps; ++i)
     {
         // --- Single integration step ---
@@ -385,6 +390,13 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
         ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0mag);
+
+        // --- Fill SimulationResult (alongside existing file writes) ---
+        std::vector<vec3> pos;
+        pos.reserve(bodies.size());
+        for (const auto& b : bodies)
+            pos.push_back(b.position);
+        result.snapshots.push_back({i, i * dt, 0.0, pos, snap});
 
         // ---------------------------------------------
         // Eclipse logging (Sun–Earth–Moon only)
@@ -752,6 +764,11 @@ void runSimulationAdaptive(
     bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
 
     // ── Adaptive loop ─────────────────────────────────────────────────────────
+    SimulationResult sim_result;
+    sim_result.body_names.reserve(bodies.size());
+    for (const auto& b : bodies)
+        sim_result.body_names.push_back(b.name);
+
     double t              = 0.0;
     double dt             = dt_initial;
     double next_output    = 0.0;   // write at t=0 and every output_interval_s
@@ -776,6 +793,13 @@ void runSimulationAdaptive(
             {
                 physics::Conservations C = physics::compute(bodies);
                 ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0);
+
+                // --- Fill SimulationResult (alongside existing file writes) ---
+                std::vector<vec3> pos;
+                pos.reserve(bodies.size());
+                for (const auto& b : bodies)
+                    pos.push_back(b.position);
+                sim_result.snapshots.push_back({0, t, result.dt_used, pos, snap});
 
                 // Positions row
                 file << t;
