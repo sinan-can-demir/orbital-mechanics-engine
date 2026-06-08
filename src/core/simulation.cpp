@@ -233,12 +233,118 @@ ConservationSnapshot computeSnapshot(const physics::Conservations& C,
                                      double E0, double L0, double P0)
 {
     ConservationSnapshot s;
-    s.Lmag = std::sqrt(C.L[0]*C.L[0] + C.L[1]*C.L[1] + C.L[2]*C.L[2]);
-    s.Pmag = std::sqrt(C.P[0]*C.P[0] + C.P[1]*C.P[1] + C.P[2]*C.P[2]);
-    s.dE   = (C.total_energy - E0) / std::abs(E0);
-    s.dL   = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
-    s.dP   = (s.Pmag - P0) / (P0  == 0.0 ? 1.0 : P0);
+    s.Lmag            = std::sqrt(C.L[0]*C.L[0] + C.L[1]*C.L[1] + C.L[2]*C.L[2]);
+    s.Pmag            = std::sqrt(C.P[0]*C.P[0] + C.P[1]*C.P[1] + C.P[2]*C.P[2]);
+    s.dE              = (C.total_energy - E0) / std::abs(E0);
+    s.dL              = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
+    s.dP              = (s.Pmag - P0) / (P0  == 0.0 ? 1.0 : P0);
+    s.total_energy    = C.total_energy;
+    s.kinetic_energy  = C.kinetic_energy;
+    s.potential_energy = C.potential_energy;
+    s.Lx = C.L[0]; s.Ly = C.L[1]; s.Lz = C.L[2];
+    s.Px = C.P[0]; s.Py = C.P[1]; s.Pz = C.P[2];
     return s;
+}
+
+void exportCSV(const SimulationResult& result, const std::string& outputPath)
+{
+    std::filesystem::path outPath(outputPath);
+    if (outPath.has_parent_path())
+        std::filesystem::create_directories(outPath.parent_path());
+
+    std::ofstream file(outputPath);
+    if (!file)
+    {
+        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
+        return;
+    }
+
+    std::string conservPath =
+        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
+    std::ofstream conservFile(conservPath);
+    if (!conservFile)
+        std::cerr << "⚠️ Could not open conservation file: " << conservPath << "\n";
+
+    // Metadata comment
+    file << "# dt=" << result.dt << " stride=" << result.stride << " bodies=";
+    for (std::size_t i = 0; i < result.body_names.size(); ++i)
+    {
+        file << result.body_names[i];
+        if (!result.body_masses.empty())
+            file << ":" << result.body_masses[i];
+        if (i + 1 < result.body_names.size()) file << ",";
+    }
+    file << "\n";
+
+    // Headers
+    if (result.is_adaptive)
+    {
+        file << "time_s";
+        for (const auto& name : result.body_names)
+            file << ",x_" << name << ",y_" << name << ",z_" << name;
+        file << ",dt_used\n";
+
+        if (conservFile)
+            conservFile << "time_s,E_total,KE,PE,Lmag,Pmag,dE_rel,dL_rel,dP_rel\n";
+    }
+    else
+    {
+        file << "step";
+        for (const auto& name : result.body_names)
+            file << ",x_" << name << ",y_" << name << ",z_" << name;
+        file << "\n";
+
+        if (conservFile)
+            conservFile << "step,E_total,KE,PE,Lx,Ly,Lz,Lmag,Px,Py,Pz,Pmag,dE_rel,dL_rel,dP_rel\n";
+    }
+
+    // Data rows
+    for (const auto& snap : result.snapshots)
+    {
+        const auto& c = snap.conservation;
+
+        // Positions row
+        if (result.is_adaptive)
+        {
+            file << snap.time_s;
+            for (const auto& pos : snap.positions)
+                file << "," << pos.x() << "," << pos.y() << "," << pos.z();
+            file << "," << snap.dt_used << "\n";
+        }
+        else
+        {
+            file << snap.step;
+            for (const auto& pos : snap.positions)
+                file << "," << pos.x() << "," << pos.y() << "," << pos.z();
+            file << "\n";
+        }
+
+        // Conservation row
+        if (conservFile)
+        {
+            if (result.is_adaptive)
+            {
+                conservFile << snap.time_s << ","
+                            << c.total_energy << "," << c.kinetic_energy << "," << c.potential_energy << ","
+                            << c.Lmag << "," << c.Pmag << ","
+                            << c.dE << "," << c.dL << "," << c.dP << "\n";
+            }
+            else
+            {
+                conservFile << snap.step << ","
+                            << c.total_energy << "," << c.kinetic_energy << "," << c.potential_energy << ","
+                            << c.Lx << "," << c.Ly << "," << c.Lz << "," << c.Lmag << ","
+                            << c.Px << "," << c.Py << "," << c.Pz << "," << c.Pmag << ","
+                            << c.dE << "," << c.dL << "," << c.dP << "\n";
+            }
+        }
+    }
+
+    file.close();
+    if (conservFile) conservFile.close();
+
+    std::cout << "✅ Positions:    " << outputPath << "\n";
+    std::cout << "✅ Conservation: " << conservPath << "\n";
 }
 
 /********************
@@ -271,180 +377,77 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
 
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    // ---------------------------------------------
-    // Optional eclipse logging for Sun–Earth–Moon
-    // ---------------------------------------------
+    // ── Eclipse logging (Sun–Earth–Moon only) ────────────────────────────────
     int idxSun, idxEarth, idxMoon;
     bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
 
     std::ofstream eclipseFile;
     if (isSEM)
     {
-        // Derive eclipse log path from the output path
-        // results/earth_moon.csv → results/earth_moon_eclipse.csv
         std::filesystem::path p(outputPath);
         std::string eclipsePath = (p.parent_path() / (p.stem().string() + "_eclipse.csv")).string();
         eclipseFile.open(eclipsePath);
-
         if (!eclipseFile)
         {
             std::cerr << "⚠️ Could not open eclipse log file: " << eclipsePath << "\n";
-            isSEM = false; // disable logging if file failed
+            isSEM = false;
         }
         else
         {
-            eclipseFile << "step,"
-                        << "shadow_x,shadow_y,shadow_z,"
-                        << "umbraRadius,penumbraRadius,eclipseType\n";
-
+            eclipseFile << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
             std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
         }
     }
 
-    // ============================
-    // Auto-create output directory
-    // ============================
-    std::filesystem::path outPath(outputPath);
-    if (outPath.has_parent_path())
-        std::filesystem::create_directories(outPath.parent_path());
-
-    // ============================
-    // Open positions file (viewer reads this)
-    // ============================
-    std::ofstream file(outputPath);
-    if (!file)
-    {
-        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
-        return;
-    }
-
-    // ============================
-    // Open conservation file (Python reads this)
-    // ============================
-    std::string conservPath =
-        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
-
-    std::ofstream conservFile(conservPath);
-    if (!conservFile)
-        std::cerr << "⚠️ Could not open conservation file: " << conservPath << "\n";
-
-    // ============================
-    // Metadata comment — positions file only
-    // ============================
-    file << "# stride=" << stride << " dt=" << dt << " bodies=";
-    for (std::size_t i = 0; i < bodies.size(); ++i)
-    {
-        file << bodies[i].name << ":" << bodies[i].mass;
-        if (i + 1 < bodies.size())
-            file << ",";
-    }
-    file << "\n";
-
-    // ============================
-    // Positions header — no conservation columns
-    // ============================
-    file << "step";
-    for (const auto& b : bodies)
-        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
-    file << "\n";
-
-    // ============================
-    // Conservation header — separate file
-    // ============================
-    if (conservFile)
-    {
-        conservFile << "step"
-                    << ",E_total,KE,PE"
-                    << ",Lx,Ly,Lz,Lmag"
-                    << ",Px,Py,Pz,Pmag"
-                    << ",dE_rel,dL_rel,dP_rel"
-                    << "\n";
-    }
-
-    // ============================
-    // Seed accelerations for leapfrog before the loop
-    // ============================
+    // ── Seed accelerations for leapfrog ──────────────────────────────────────
     if (integrator == Integrator::Leapfrog)
         updateAccelerations(bodies);
 
-    // ============================
-    // Main Integration Loop
-    // ============================
+    // ── Build result metadata ─────────────────────────────────────────────────
     SimulationResult result;
+    result.dt     = dt;
+    result.stride = stride;
     result.body_names.reserve(bodies.size());
+    result.body_masses.reserve(bodies.size());
     for (const auto& b : bodies)
+    {
         result.body_names.push_back(b.name);
+        result.body_masses.push_back(b.mass);
+    }
 
+    // ── Main integration loop ─────────────────────────────────────────────────
     for (int i = 0; i < steps; ++i)
     {
-        // --- Single integration step ---
         if (integrator == Integrator::Leapfrog)
             leapfrogStep(bodies, dt);
         else
             rk4Step(bodies, dt);
 
-        // Only write to CSV every `stride` steps
         if (i % stride != 0)
             continue;
 
-        // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
         ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0mag);
 
-        // --- Fill SimulationResult (alongside existing file writes) ---
         std::vector<vec3> pos;
         pos.reserve(bodies.size());
         for (const auto& b : bodies)
             pos.push_back(b.position);
         result.snapshots.push_back({i, i * dt, 0.0, pos, snap});
 
-        // ---------------------------------------------
-        // Eclipse logging (Sun–Earth–Moon only)
-        // ---------------------------------------------
         if (isSEM)
         {
-            const vec3& S = bodies[idxSun].position;
-            const vec3& E = bodies[idxEarth].position;
-            const vec3& M = bodies[idxMoon].position;
-
-            EclipseResult e = computeSolarEclipse(S, E, M);
-
+            EclipseResult e = computeSolarEclipse(
+                bodies[idxSun].position, bodies[idxEarth].position, bodies[idxMoon].position);
             eclipseFile << i << "," << e.shadowCenter.x() << "," << e.shadowCenter.y() << ","
                         << e.shadowCenter.z() << "," << e.umbraRadius << "," << e.penumbraRadius
                         << "," << e.eclipseType << "\n";
         }
-
-        // ============================
-        // CSV ROW (main orbit data)
-        // ============================
-        // Positions row
-        file << i;
-        for (const auto& b : bodies)
-            file << "," << b.position.x() << "," << b.position.y() << "," << b.position.z();
-        file << "\n";
-
-        // Conservation row — write less frequently
-        if (conservFile && i % (stride * 10) == 0)
-        {
-            conservFile << i << "," << C.total_energy << "," << C.kinetic_energy << ","
-                        << C.potential_energy << "," << C.L[0] << "," << C.L[1] << "," << C.L[2]
-                        << "," << snap.Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
-                        << snap.Pmag << "," << snap.dE << "," << snap.dL << "," << snap.dP << "\n";
-        }
     }
 
-    file.close();
-    if (conservFile)
-        conservFile.close();
+    if (isSEM) eclipseFile.close();
 
-    std::cout << "✅ Positions:     " << outputPath << "\n";
-    std::cout << "✅ Conservation:  " << conservPath << "\n";
-    if (isSEM)
-    {
-        eclipseFile.close();
-    }
-
-    std::cout << "✅ Simulation complete: " << outputPath << "\n";
+    exportCSV(result, outputPath);
 }
 // ============================================================================
 // RK45 Dormand-Prince Adaptive Integrator
@@ -716,109 +719,51 @@ void runSimulationAdaptive(
 
     // ── Conservation baseline ─────────────────────────────────────────────────
     physics::Conservations C0 = physics::compute(bodies);
-    double E0   = C0.total_energy;
-    double L0   = std::sqrt(C0.L[0]*C0.L[0] + C0.L[1]*C0.L[1] + C0.L[2]*C0.L[2]);
-    double P0   = std::sqrt(C0.P[0]*C0.P[0] + C0.P[1]*C0.P[1] + C0.P[2]*C0.P[2]);
+    double E0 = C0.total_energy;
+    double L0 = std::sqrt(C0.L[0]*C0.L[0] + C0.L[1]*C0.L[1] + C0.L[2]*C0.L[2]);
+    double P0 = std::sqrt(C0.P[0]*C0.P[0] + C0.P[1]*C0.P[1] + C0.P[2]*C0.P[2]);
 
-    // ── Output files ──────────────────────────────────────────────────────────
-    std::filesystem::path outPath(outputPath);
-    if (outPath.has_parent_path())
-        std::filesystem::create_directories(outPath.parent_path());
-
-    std::ofstream file(outputPath);
-    if (!file)
-    {
-        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
-        return;
-    }
-
-    std::string conservPath =
-        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
-    std::ofstream conservFile(conservPath);
-
-    // ── Headers ───────────────────────────────────────────────────────────────
-    file << "# rk45 dt_initial=" << dt_initial
-         << " atol=" << atol << " rtol=" << rtol
-         << " bodies=";
-    for (std::size_t i = 0; i < bodies.size(); ++i)
-    {
-        file << bodies[i].name << ":" << bodies[i].mass;
-        if (i + 1 < bodies.size()) file << ",";
-    }
-    file << "\n";
-
-    // Use time_s instead of step for adaptive output
-    file << "time_s";
+    // ── Build result metadata ─────────────────────────────────────────────────
+    SimulationResult sim_result;
+    sim_result.dt          = dt_initial;
+    sim_result.is_adaptive = true;
+    sim_result.body_names.reserve(bodies.size());
+    sim_result.body_masses.reserve(bodies.size());
     for (const auto& b : bodies)
-        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
-    file << ",dt_used\n";
-
-    if (conservFile)
     {
-        conservFile << "time_s,E_total,KE,PE,Lmag,Pmag"
-                    << ",dE_rel,dL_rel,dP_rel\n";
+        sim_result.body_names.push_back(b.name);
+        sim_result.body_masses.push_back(b.mass);
     }
-
-    // ── Eclipse detection ─────────────────────────────────────────────────────
-    int idxSun, idxEarth, idxMoon;
-    bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
 
     // ── Adaptive loop ─────────────────────────────────────────────────────────
-    SimulationResult sim_result;
-    sim_result.body_names.reserve(bodies.size());
-    for (const auto& b : bodies)
-        sim_result.body_names.push_back(b.name);
-
-    double t              = 0.0;
-    double dt             = dt_initial;
-    double next_output    = 0.0;   // write at t=0 and every output_interval_s
-    int    n_steps        = 0;
-    int    n_rejected     = 0;
+    double t           = 0.0;
+    double dt          = dt_initial;
+    double next_output = 0.0;
+    int    n_steps     = 0;
+    int    n_rejected  = 0;
 
     while (t < duration_s)
     {
-        // Don't overshoot the end
         if (t + dt > duration_s)
             dt = duration_s - t;
 
-        auto result = rk45Step(bodies, dt, atol, rtol);
+        auto step = rk45Step(bodies, dt, atol, rtol);
 
-        if (result.accepted)
+        if (step.accepted)
         {
-            t  += result.dt_used;
+            t += step.dt_used;
             ++n_steps;
 
-            // Write output at regular simulated-time intervals
             if (t >= next_output)
             {
                 physics::Conservations C = physics::compute(bodies);
                 ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0);
 
-                // --- Fill SimulationResult (alongside existing file writes) ---
                 std::vector<vec3> pos;
                 pos.reserve(bodies.size());
                 for (const auto& b : bodies)
                     pos.push_back(b.position);
-                sim_result.snapshots.push_back({0, t, result.dt_used, pos, snap});
-
-                // Positions row
-                file << t;
-                for (const auto& b : bodies)
-                    file << "," << b.position.x()
-                         << "," << b.position.y()
-                         << "," << b.position.z();
-                file << "," << result.dt_used << "\n";
-
-                // Conservation row
-                if (conservFile)
-                {
-                    conservFile << t << ","
-                                << C.total_energy << ","
-                                << C.kinetic_energy << ","
-                                << C.potential_energy << ","
-                                << snap.Lmag << "," << snap.Pmag << ","
-                                << snap.dE << "," << snap.dL << "," << snap.dP << "\n";
-                }
+                sim_result.snapshots.push_back({0, t, step.dt_used, pos, snap});
 
                 next_output += output_interval_s;
             }
@@ -828,20 +773,14 @@ void runSimulationAdaptive(
             ++n_rejected;
         }
 
-        // Clamp next timestep
-        dt = std::clamp(result.dt_next, dt_min, dt_max);
+        dt = std::clamp(step.dt_next, dt_min, dt_max);
     }
 
-    file.close();
-    if (conservFile) conservFile.close();
-
     double reject_pct = 100.0 * n_rejected / std::max(1, n_steps + n_rejected);
-
     std::cout << "✅ RK45 complete:\n"
-              << "   Steps accepted: " << n_steps    << "\n"
-              << "   Steps rejected: " << n_rejected
-              << " (" << reject_pct << "%)\n"
-              << "   Final dt:       " << dt         << " s\n"
-              << "   Positions:      " << outputPath  << "\n"
-              << "   Conservation:   " << conservPath << "\n";
+              << "   Steps accepted: " << n_steps   << "\n"
+              << "   Steps rejected: " << n_rejected << " (" << reject_pct << "%)\n"
+              << "   Final dt:       " << dt         << " s\n";
+
+    exportCSV(sim_result, outputPath);
 }

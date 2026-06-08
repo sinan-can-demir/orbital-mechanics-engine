@@ -69,6 +69,11 @@ struct ConservationSnapshot
     double dP;    // relative linear momentum drift
     double Lmag;  // angular momentum magnitude
     double Pmag;  // linear momentum magnitude
+    double total_energy;
+    double kinetic_energy;
+    double potential_energy;
+    double Lx, Ly, Lz;
+    double Px, Py, Pz;
 };
 
 struct SimulationSnapshot
@@ -81,12 +86,18 @@ struct SimulationSnapshot
 };
 
 struct SimulationResult{
-    std::vector<std::string> body_names;
+    std::vector<std::string>        body_names;
+    std::vector<double>             body_masses;
     std::vector<SimulationSnapshot> snapshots;
+    double dt        = 0.0;
+    int    stride    = 1;
+    bool   is_adaptive = false;
 };
 
 ConservationSnapshot computeSnapshot(const physics::Conservations& C,
                                      double E0, double L0, double P0);
+
+void exportCSV(const SimulationResult& result, const std::string& outputPath);
 
 // ── Fixed-step integrators ────────────────────────────────────────────────────
 void eulerStep(CelestialBody& body, double dt);
