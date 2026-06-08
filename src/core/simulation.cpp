@@ -229,6 +229,18 @@ bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEa
     return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
 }
 
+ConservationSnapshot computeSnapshot(const physics::Conservations& C,
+                                     double E0, double L0, double P0)
+{
+    ConservationSnapshot s;
+    s.Lmag = std::sqrt(C.L[0]*C.L[0] + C.L[1]*C.L[1] + C.L[2]*C.L[2]);
+    s.Pmag = std::sqrt(C.P[0]*C.P[0] + C.P[1]*C.P[1] + C.P[2]*C.P[2]);
+    s.dE   = (C.total_energy - E0) / std::abs(E0);
+    s.dL   = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
+    s.dP   = (s.Pmag - P0) / (P0  == 0.0 ? 1.0 : P0);
+    return s;
+}
+
 /********************
  * runSimulation
  * @brief: Generic N-body simulation runner using RK4 integrator.
@@ -372,14 +384,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
 
         // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
-
-        double Lmag = std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
-
-        double Pmag = std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
-
-        double dE = (C.total_energy - E0) / std::abs(E0);
-        double dL = (Lmag - L0) / L0;
-        double dP = (Pmag - P0mag) / (P0mag == 0 ? 1.0 : P0mag);
+        ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0mag);
 
         // ---------------------------------------------
         // Eclipse logging (Sun–Earth–Moon only)
@@ -411,8 +416,8 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         {
             conservFile << i << "," << C.total_energy << "," << C.kinetic_energy << ","
                         << C.potential_energy << "," << C.L[0] << "," << C.L[1] << "," << C.L[2]
-                        << "," << Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
-                        << Pmag << "," << dE << "," << dL << "," << dP << "\n";
+                        << "," << snap.Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
+                        << snap.Pmag << "," << snap.dE << "," << snap.dL << "," << snap.dP << "\n";
         }
     }
 
@@ -770,11 +775,7 @@ void runSimulationAdaptive(
             if (t >= next_output)
             {
                 physics::Conservations C = physics::compute(bodies);
-                double Lmag = std::sqrt(C.L[0]*C.L[0]+C.L[1]*C.L[1]+C.L[2]*C.L[2]);
-                double Pmag = std::sqrt(C.P[0]*C.P[0]+C.P[1]*C.P[1]+C.P[2]*C.P[2]);
-                double dE   = (C.total_energy - E0) / std::abs(E0);
-                double dL   = (Lmag - L0) / (L0 == 0 ? 1.0 : L0);
-                double dP   = (Pmag - P0) / (P0 == 0 ? 1.0 : P0);
+                ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0);
 
                 // Positions row
                 file << t;
@@ -791,8 +792,8 @@ void runSimulationAdaptive(
                                 << C.total_energy << ","
                                 << C.kinetic_energy << ","
                                 << C.potential_energy << ","
-                                << Lmag << "," << Pmag << ","
-                                << dE << "," << dL << "," << dP << "\n";
+                                << snap.Lmag << "," << snap.Pmag << ","
+                                << snap.dE << "," << snap.dL << "," << snap.dP << "\n";
                 }
 
                 next_output += output_interval_s;

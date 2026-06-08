@@ -61,6 +61,19 @@ std::vector<CelestialBody> buildIntermediateStateMulti(
     const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted,
     double dt);
 
+// ── Conservation snapshot ─────────────────────────────────────────────────────
+struct ConservationSnapshot
+{
+    double dE;    // relative energy drift
+    double dL;    // relative angular momentum drift
+    double dP;    // relative linear momentum drift
+    double Lmag;  // angular momentum magnitude
+    double Pmag;  // linear momentum magnitude
+};
+
+ConservationSnapshot computeSnapshot(const physics::Conservations& C,
+                                     double E0, double L0, double P0);
+
 // ── Fixed-step integrators ────────────────────────────────────────────────────
 void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt);
