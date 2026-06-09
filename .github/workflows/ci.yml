@@ -1,4 +1,4 @@
-name: C++ CI
+name: CI
 
 on:
   push:
@@ -101,3 +101,28 @@ jobs:
         - name: Run test suite
           run: ctest --output-on-failure
           working-directory: build
+
+  python:
+    needs: lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Install Python build tools
+        run: pip install scikit-build-core pytest numpy --quiet
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DBUILD_VIEWER=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Install Python bindings
+        run: pip install -e . --no-build-isolation -q
+
+      - name: Run Python API tests
+        run: pytest tests/test_python_api.py -v

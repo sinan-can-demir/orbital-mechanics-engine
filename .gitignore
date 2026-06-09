@@ -50,7 +50,6 @@ dist/
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb
 
 # Virtual environments
 venv/
@@ -135,6 +134,8 @@ vgcore.*
 !plotting_scripts/**
 !.github/
 !.github/**
+!examples
+!examples/**
 !CMakeLists.txt
 !Makefile
 !.clang-format

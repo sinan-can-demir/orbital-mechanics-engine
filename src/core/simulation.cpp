@@ -362,53 +362,17 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
  * @exception none
  * @return none
  *********************/
-void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
-                   const std::string& outputPath, Integrator integrator, int stride)
+SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
+                                   Integrator integrator, int stride)
 {
-    if (bodies.empty())
-    {
-        std::cerr << "❌ No bodies to simulate.\n";
-        return;
-    }
-
-    // ============================
-    // Initial conservation checks
-    // ============================
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
-
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
-
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    // ── Eclipse logging (Sun–Earth–Moon only) ────────────────────────────────
-    int idxSun, idxEarth, idxMoon;
-    bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
-
-    std::ofstream eclipseFile;
-    if (isSEM)
-    {
-        std::filesystem::path p(outputPath);
-        std::string eclipsePath = (p.parent_path() / (p.stem().string() + "_eclipse.csv")).string();
-        eclipseFile.open(eclipsePath);
-        if (!eclipseFile)
-        {
-            std::cerr << "⚠️ Could not open eclipse log file: " << eclipsePath << "\n";
-            isSEM = false;
-        }
-        else
-        {
-            eclipseFile
-                << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
-            std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
-        }
-    }
-
-    // ── Seed accelerations for leapfrog ──────────────────────────────────────
     if (integrator == Integrator::Leapfrog)
         updateAccelerations(bodies);
 
-    // ── Build result metadata ─────────────────────────────────────────────────
     SimulationResult result;
     result.dt = dt;
     result.stride = stride;
@@ -420,7 +384,6 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         result.body_masses.push_back(b.mass);
     }
 
-    // ── Main integration loop ─────────────────────────────────────────────────
     for (int i = 0; i < steps; ++i)
     {
         if (integrator == Integrator::Leapfrog)
@@ -439,19 +402,54 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         for (const auto& b : bodies)
             pos.push_back(b.position);
         result.snapshots.push_back({i, i * dt, 0.0, pos, snap});
-
-        if (isSEM)
-        {
-            EclipseResult e = computeSolarEclipse(
-                bodies[idxSun].position, bodies[idxEarth].position, bodies[idxMoon].position);
-            eclipseFile << i << "," << e.shadowCenter.x() << "," << e.shadowCenter.y() << ","
-                        << e.shadowCenter.z() << "," << e.umbraRadius << "," << e.penumbraRadius
-                        << "," << e.eclipseType << "\n";
-        }
     }
 
-    if (isSEM)
-        eclipseFile.close();
+    return result;
+}
+
+void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
+                   const std::string& outputPath, Integrator integrator, int stride)
+{
+    if (bodies.empty())
+    {
+        std::cerr << "❌ No bodies to simulate.\n";
+        return;
+    }
+
+    SimulationResult result = runSimulationCore(bodies, steps, dt, integrator, stride);
+
+    // ── Eclipse logging from stored positions ─────────────────────────────────
+    int idxSun = -1, idxEarth = -1, idxMoon = -1;
+    for (int i = 0; i < (int)result.body_names.size(); ++i)
+    {
+        if (result.body_names[i] == "Sun")
+            idxSun = i;
+        if (result.body_names[i] == "Earth")
+            idxEarth = i;
+        if (result.body_names[i] == "Moon")
+            idxMoon = i;
+    }
+
+    if (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0)
+    {
+        std::filesystem::path p(outputPath);
+        std::string eclipsePath = (p.parent_path() / (p.stem().string() + "_eclipse.csv")).string();
+        std::ofstream eclipseFile(eclipsePath);
+        if (eclipseFile)
+        {
+            std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
+            eclipseFile
+                << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
+            for (const auto& snap : result.snapshots)
+            {
+                EclipseResult e = computeSolarEclipse(
+                    snap.positions[idxSun], snap.positions[idxEarth], snap.positions[idxMoon]);
+                eclipseFile << snap.step << "," << e.shadowCenter.x() << "," << e.shadowCenter.y()
+                            << "," << e.shadowCenter.z() << "," << e.umbraRadius << ","
+                            << e.penumbraRadius << "," << e.eclipseType << "\n";
+            }
+        }
+    }
 
     exportCSV(result, outputPath);
 }

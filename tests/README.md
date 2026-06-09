@@ -1,32 +1,45 @@
 # Tests
 
-This directory contains validation tests for the orbital mechanics engine.
+This directory contains the full test suite for the orbital mechanics engine.
 
-## Planned test suites
+## Running all tests
 
-### Conservation law tests (`tests/core/`)
-Verify that the RK4 and Leapfrog integrators preserve energy, linear momentum,
-and angular momentum within acceptable bounds.
-
-Target: `|dE/E₀|` < 1e-5 over 10,000 steps at dt=60s for the Earth–Moon system.
-
-### Regression tests (`tests/regression/`)
-Store known-good CSV outputs and assert that simulation results match them
-within a tight tolerance after any code change.
-
-### Integration tests (`tests/integration/`)
-End-to-end tests: load a JSON system, run the CLI, parse the CSV output,
-verify physical quantities.
-
-## Running tests
-
-Tests will be driven by CMake's CTest once implemented:
+### C++ tests (via CTest)
 
 ```bash
-cd build
-cmake ..
-ctest --output-on-failure
+cd build && ctest --output-on-failure
 ```
 
-See `CONTRIBUTING.md` for the physics accuracy thresholds required before
-any PR can be merged.
+### Python API tests (via pytest)
+
+```bash
+pytest tests/test_python_api.py -v
+```
+
+---
+
+## Test files
+
+| File | Type | What it tests |
+|------|------|---------------|
+| `test_conservation.cpp` | C++ | Energy drift < 1e-5 over 10k steps (RK4) |
+| `test_two_body.cpp` | C++ | Circular orbit period matches Kepler's 3rd law |
+| `test_leapfrog.cpp` | C++ | Symplectic energy drift bounded and non-monotonic |
+| `test_barycenter.cpp` | C++ | COM position and velocity < 1e-10 after normalization |
+| `test_horizons_parser.cpp` | C++ | HORIZONS SI unit conversion |
+| `test_system_writer.cpp` | C++ | JSON system file round-trip |
+| `test_cli.cpp` | C++ | CLI exit codes and output file generation |
+| `test_python_api.py` | Python | Import, simulate, NumPy shapes, energy conservation |
+
+---
+
+## Accuracy thresholds
+
+| Quantity | Threshold | Integrator |
+|----------|-----------|------------|
+| Relative energy drift `\|dE/E₀\|` | < 1e-5 | RK4, 10k steps, dt=60s |
+| Relative energy drift `\|dE/E₀\|` | < 1e-10 | RK45, 1-year Earth-Moon |
+| COM position after normalization | < 1e-10 m | — |
+| COM velocity after normalization | < 1e-10 m/s | — |
+
+See `CONTRIBUTING.md` for the full policy on accuracy thresholds in PRs.
