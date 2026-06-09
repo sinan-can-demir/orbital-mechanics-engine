@@ -113,7 +113,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Install Python build tools
-        run: pip install scikit-build-core pytest --quiet
+        run: pip install scikit-build-core pytest numpy --quiet
 
       - name: Configure CMake
         run: cmake -S . -B build -DBUILD_VIEWER=OFF
