@@ -410,6 +410,13 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     result.body_names.reserve(bodies.size());
     result.body_masses.reserve(bodies.size());
     for (const auto& b : bodies)
+        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
+    file << "\n";
+
+    // ============================
+    // Conservation header — separate file
+    // ============================
+    if (conservFile)
     {
         result.body_names.push_back(b.name);
         result.body_masses.push_back(b.mass);

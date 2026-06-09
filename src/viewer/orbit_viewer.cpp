@@ -1027,6 +1027,7 @@ int main(int argc, char** argv)
 
                 body.mesh.draw();
             }
+            buildOrbitBuffers();
         }
 
         // ------------------------------------------------
