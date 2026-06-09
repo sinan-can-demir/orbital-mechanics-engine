@@ -21,6 +21,17 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 # ------------------------------------------------------------
 find_package(CURL REQUIRED)
 
+# ------------------------------------------------------------
+# pybind11
+# ------------------------------------------------------------
+include(FetchContent)
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v2.13.6
+)
+FetchContent_MakeAvailable(pybind11)
+
 # Viewer-only dependencies (only searched if viewer enabled)
 if (BUILD_VIEWER)
     find_package(OpenGL)
@@ -198,4 +209,15 @@ target_include_directories(test_cli PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME cli_smoke
     COMMAND test_cli
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# ------------------------------------------------------------
+# orbit (Python module)
+# ------------------------------------------------------------
+pybind11_add_module(orbit orbit_py/bindings.cpp)
+
+target_link_libraries(orbit PRIVATE orbit_core)
+
+target_include_directories(orbit PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
 )
