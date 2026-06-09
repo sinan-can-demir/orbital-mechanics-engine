@@ -58,10 +58,10 @@ PYBIND11_MODULE(orbit, m)
     m.attr("__version__") = "2.0.0-dev";
 
     py::enum_<Integrator>(m, "Integrator")
-        .value("RK4",      Integrator::RK4)
+        .value("RK4", Integrator::RK4)
         .value("Leapfrog", Integrator::Leapfrog)
-        .value("RK45",     Integrator::RK45)
-        .value("Euler",    Integrator::euler)
+        .value("RK45", Integrator::RK45)
+        .value("Euler", Integrator::euler)
         .export_values();
 
     py::class_<SimulationSnapshot>(m, "SimulationSnapshot")
@@ -78,15 +78,12 @@ PYBIND11_MODULE(orbit, m)
         .def("positions_numpy", &positions_numpy)
         .def("energies_numpy", &energies_numpy);
 
-    m.def("simulate", &simulate,
-          py::arg("path"), py::arg("steps"), py::arg("dt"),
+    m.def("simulate", &simulate, py::arg("path"), py::arg("steps"), py::arg("dt"),
           py::arg("integrator") = Integrator::RK4, py::arg("stride") = 1,
           "Run a fixed-step simulation from a JSON system file");
 
-    m.def("simulate_adaptive", &simulate_adaptive,
-          py::arg("path"), py::arg("duration_s"), py::arg("dt_initial"),
-          py::arg("output_interval_s") = 3600.0,
-          py::arg("atol") = 1e-9, py::arg("rtol") = 1e-9,
-          py::arg("dt_min") = 1.0, py::arg("dt_max") = 86400.0,
+    m.def("simulate_adaptive", &simulate_adaptive, py::arg("path"), py::arg("duration_s"),
+          py::arg("dt_initial"), py::arg("output_interval_s") = 3600.0, py::arg("atol") = 1e-9,
+          py::arg("rtol") = 1e-9, py::arg("dt_min") = 1.0, py::arg("dt_max") = 86400.0,
           "Run an adaptive RK45 simulation from a JSON system file");
 }
