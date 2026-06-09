@@ -401,7 +401,7 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         pos.reserve(bodies.size());
         for (const auto& b : bodies)
             pos.push_back(b.position);
-        result.snapshots.push_back({i, i * dt, 0.0, pos, snap});
+        result.snapshots.push_back({i, i * dt, dt, pos, snap});
     }
 
     return result;
@@ -708,35 +708,30 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
  * @param dt_min            Minimum allowed timestep
  * @param dt_max            Maximum allowed timestep
  ***********************/
-void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
-                           const std::string& outputPath, double output_interval_s, double atol,
-                           double rtol, double dt_min, double dt_max)
+SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, double duration_s,
+                                           double dt_initial, double output_interval_s, double atol,
+                                           double rtol, double dt_min, double dt_max)
 {
     if (bodies.empty())
     {
         std::cerr << "❌ No bodies to simulate.\n";
-        return;
+        return {};
     }
 
-    // ── Conservation baseline ─────────────────────────────────────────────────
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
     double P0 = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    // ── Build result metadata ─────────────────────────────────────────────────
     SimulationResult sim_result;
     sim_result.dt = dt_initial;
     sim_result.is_adaptive = true;
-    sim_result.body_names.reserve(bodies.size());
-    sim_result.body_masses.reserve(bodies.size());
     for (const auto& b : bodies)
     {
         sim_result.body_names.push_back(b.name);
         sim_result.body_masses.push_back(b.mass);
     }
 
-    // ── Adaptive loop ─────────────────────────────────────────────────────────
     double t = 0.0;
     double dt = dt_initial;
     double next_output = 0.0;
@@ -783,5 +778,14 @@ void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s
               << "   Steps rejected: " << n_rejected << " (" << reject_pct << "%)\n"
               << "   Final dt:       " << dt << " s\n";
 
-    exportCSV(sim_result, outputPath);
+    return sim_result;
+}
+
+void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
+                           const std::string& outputPath, double output_interval_s, double atol,
+                           double rtol, double dt_min, double dt_max)
+{
+    SimulationResult result = runSimulationAdaptiveCore(
+        bodies, duration_s, dt_initial, output_interval_s, atol, rtol, dt_min, dt_max);
+    exportCSV(result, outputPath);
 }
