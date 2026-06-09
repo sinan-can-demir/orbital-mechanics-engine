@@ -58,16 +58,16 @@ build-viewer: $(BUILD_DIR)/Makefile
 	@$(MAKE) -C $(BUILD_DIR) orbit-viewer -j$$(nproc)
 
 clean:
-	@echo "$(YELLOW)Cleaning build directory...$(NC)"
+	@echo -e "$(YELLOW)Cleaning build directory...$(NC)"
 	@rm -rf $(BUILD_DIR)
-	@echo "$(GREEN)Clean complete.$(NC)"
+	@echo -e "$(GREEN)Clean complete.$(NC)"
 
 reconfigure:
-	@echo "$(BLUE)Reconfiguring project...$(NC)"
+	@echo -e "$(BLUE)Reconfiguring project...$(NC)"
 	@rm -rf $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && $(CMAKE_CONFIG)
-	@echo "$(GREEN)Reconfiguration complete.$(NC)"
+	@echo -e "$(GREEN)Reconfiguration complete.$(NC)"
 
 # ========================================
 # RUN TARGETS
@@ -82,24 +82,24 @@ run: $(SIM_EXE)
 		--output $(DEFAULT_OUTPUT)
 
 run-earth-moon: $(SIM_EXE)
-	@echo "$(BLUE)Running Earth-Moon simulation...$(NC)"
+	@echo -e "$(BLUE)Running Earth-Moon simulation...$(NC)"
 	@mkdir -p $(RESULTS_DIR)
 	@$(SIM_EXE) run \
 		--system $(SYSTEMS_DIR)/earth_moon.json \
 		--steps $(DEFAULT_STEPS) \
 		--dt $(DEFAULT_DT) \
 		--output $(RESULTS_DIR)/earth_moon_out.csv
-	@echo "$(GREEN)Output: $(RESULTS_DIR)/earth_moon_out.csv$(NC)"
+	@echo -e "$(GREEN)Output: $(RESULTS_DIR)/earth_moon_out.csv$(NC)"
 
 run-solar-system: $(SIM_EXE)
-	@echo "$(BLUE)Running Solar System simulation (100k steps)...$(NC)"
+	@echo -e "$(BLUE)Running Solar System simulation (100k steps)...$(NC)"
 	@mkdir -p $(RESULTS_DIR)
 	@$(SIM_EXE) run \
 		--system $(SYSTEMS_DIR)/solar_system.json \
 		--steps 100000 \
 		--dt 3600 \
 		--output $(RESULTS_DIR)/solar_system_out.csv
-	@echo "$(GREEN)Output: $(RESULTS_DIR)/solar_system_out.csv$(NC)"
+	@echo -e "$(GREEN)Output: $(RESULTS_DIR)/solar_system_out.csv$(NC)"
 
 view: $(VIEWER_EXE)
 	@$(VIEWER_EXE)
@@ -129,16 +129,16 @@ validate-earth-moon: $(SIM_EXE)
 	@$(SIM_EXE) validate --system $(SYSTEMS_DIR)/earth_moon.json
 
 test: validate-earth-moon
-	@echo "$(BLUE)Running quick simulation test...$(NC)"
+	@echo -e "$(BLUE)Running quick simulation test...$(NC)"
 	@$(SIM_EXE) run \
 		--system $(SYSTEMS_DIR)/earth_moon.json \
 		--steps 100 \
 		--dt 3600 \
 		--output $(RESULTS_DIR)/test_out.csv
-	@echo "$(GREEN)Test complete. Output: $(RESULTS_DIR)/test_out.csv$(NC)"
+	@echo -e "$(GREEN)Test complete. Output: $(RESULTS_DIR)/test_out.csv$(NC)"
 
 test-conservation: $(SIM_EXE)
-	@echo "$(BLUE)Running conservation test...$(NC)"
+	@echo -e "$(BLUE)Running conservation test...$(NC)"
 	@./build/bin/test_conservation
 
 build-earth-moon: $(SIM_EXE)
@@ -169,26 +169,26 @@ pipeline-earth-moon: build-earth-moon $(SIM_EXE)
 # ========================================
 
 plot: plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
-	@echo "$(GREEN)All plots generated.$(NC)"
+	@echo -e "$(GREEN)All plots generated.$(NC)"
 
 plot-energy:
-	@echo "$(BLUE)Generating energy conservation plot...$(NC)"
+	@echo -e "$(BLUE)Generating energy conservation plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) energy_conservation.py
 
 plot-momentum:
-	@echo "$(BLUE)Generating angular momentum plot...$(NC)"
+	@echo -e "$(BLUE)Generating angular momentum plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) angular_momentum_plot.py
 
 plot-3d:
-	@echo "$(BLUE)Generating 3D orbit plot...$(NC)"
+	@echo -e "$(BLUE)Generating 3D orbit plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dplot.py
 
 plot-3d-exaggerated:
-	@echo "$(BLUE)Generating 3D exaggerated plot...$(NC)"
+	@echo -e "$(BLUE)Generating 3D exaggerated plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dexaggerated_plot.py
 
 plot-3d-earth-moon:
-	@echo "$(BLUE)Generating Earth-Moon 3D plot...$(NC)"
+	@echo -e "$(BLUE)Generating Earth-Moon 3D plot...$(NC)"
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dplot_earth_moon.py
 
 # ========================================
@@ -215,12 +215,12 @@ FORMAT_FILES := $(shell find src include tests orbit_py \( -name '*.cpp' -o -nam
 CLANG_FORMAT ?= clang-format
 
 format:
-	@echo "$(BLUE)Formatting code with clang-format...$(NC)"
+	@echo -e "$(BLUE)Formatting code with clang-format...$(NC)"
 	@clang-format -i $(FORMAT_FILES)
-	@echo "$(GREEN)Formatting complete.$(NC)"
+	@echo -e "$(GREEN)Formatting complete.$(NC)"
 
 format-check:
-	@echo "$(BLUE)Checking formatting (CI mode)...$(NC)"
+	@echo -e "$(BLUE)Checking formatting (CI mode)...$(NC)"
 	@clang-format --dry-run --Werror $(FORMAT_FILES)
 
 
