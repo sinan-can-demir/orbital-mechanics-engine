@@ -785,7 +785,7 @@ void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s
                            const std::string& outputPath, double output_interval_s, double atol,
                            double rtol, double dt_min, double dt_max)
 {
-    SimulationResult result = runSimulationAdaptiveCore(bodies, duration_s, dt_initial,
-                                                        output_interval_s, atol, rtol, dt_min, dt_max);
+    SimulationResult result = runSimulationAdaptiveCore(
+        bodies, duration_s, dt_initial, output_interval_s, atol, rtol, dt_min, dt_max);
     exportCSV(result, outputPath);
 }
