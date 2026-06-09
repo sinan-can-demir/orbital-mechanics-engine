@@ -211,7 +211,7 @@ python-check: python-install python-test
 # FORMATTING TARGETS
 # ========================================
 
-FORMAT_FILES := $(shell find src include tests \( -name '*.cpp' -o -name '*.h' \))
+FORMAT_FILES := $(shell find src include tests orbit_py \( -name '*.cpp' -o -name '*.h' \))
 CLANG_FORMAT ?= clang-format
 
 format:
