@@ -15,7 +15,7 @@ SimulationResult simulate(const std::string& path, int steps, double dt)
 
 py::array_t<double> positions_numpy(const SimulationResult& result)
 {
-    size_t n_steps  = result.snapshots.size();
+    size_t n_steps = result.snapshots.size();
     size_t n_bodies = result.body_names.size();
 
     py::array_t<double> arr({n_steps, n_bodies, size_t(3)});
@@ -48,19 +48,18 @@ PYBIND11_MODULE(orbit, m)
     m.attr("__version__") = "2.0.0-dev";
 
     py::class_<SimulationSnapshot>(m, "SimulationSnapshot")
-        .def_readonly("step",      &SimulationSnapshot::step)
-        .def_readonly("time_s",    &SimulationSnapshot::time_s)
+        .def_readonly("step", &SimulationSnapshot::step)
+        .def_readonly("time_s", &SimulationSnapshot::time_s)
         .def_readonly("positions", &SimulationSnapshot::positions);
 
     py::class_<SimulationResult>(m, "SimulationResult")
-        .def_readonly("body_names",  &SimulationResult::body_names)
+        .def_readonly("body_names", &SimulationResult::body_names)
         .def_readonly("body_masses", &SimulationResult::body_masses)
-        .def_readonly("snapshots",   &SimulationResult::snapshots)
-        .def_readonly("dt",          &SimulationResult::dt)
+        .def_readonly("snapshots", &SimulationResult::snapshots)
+        .def_readonly("dt", &SimulationResult::dt)
         .def("positions_numpy", &positions_numpy)
-        .def("energies_numpy",  &energies_numpy);
+        .def("energies_numpy", &energies_numpy);
 
-    m.def("simulate", &simulate,
-          py::arg("path"), py::arg("steps"), py::arg("dt"),
+    m.def("simulate", &simulate, py::arg("path"), py::arg("steps"), py::arg("dt"),
           "Run a simulation from a JSON system file");
 }
