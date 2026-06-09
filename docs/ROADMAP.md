@@ -57,7 +57,7 @@ Track these as hard requirements. Do not submit until all are green.
 | Substantial functionality | ✅ Done | — |
 | Community guidelines (CONTRIBUTING.md) | ✅ Done | — |
 | Passing test suite (`ctest`) | ✅ Done | — |
-| HORIZONS validation study | ❌ Missing | 2 |
+| HORIZONS validation study | ✅ Done | 2 |
 | Python API (pybind11) | ❌ Missing | 3 |
 | Jupyter notebook examples | ❌ Missing | 3 |
 | Statement of need | ❌ Missing | 5 |

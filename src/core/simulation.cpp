@@ -8,18 +8,8 @@
 #include "simulation.h"
 #include "eclipse.h"
 #include "vec3.h"
+#include <algorithm>
 #include <filesystem>
-
-/****************
- * struct StateDerivative
- * Purpose: Captures instantaneous derivatives for position and velocity
- * components.
- *****************/
-struct StateDerivative
-{
-    vec3 dpos; ///< Time derivative of position (velocity)
-    vec3 dvel; ///< Time derivative of velocity (acceleration)
-};
 
 /***********************
  * computeGravitationalForce
@@ -239,6 +229,128 @@ bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEa
     return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
 }
 
+ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0, double L0,
+                                     double P0)
+{
+    ConservationSnapshot s;
+    s.Lmag = std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
+    s.Pmag = std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
+    s.dE = (C.total_energy - E0) / std::abs(E0);
+    s.dL = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
+    s.dP = (s.Pmag - P0) / (P0 == 0.0 ? 1.0 : P0);
+    s.total_energy = C.total_energy;
+    s.kinetic_energy = C.kinetic_energy;
+    s.potential_energy = C.potential_energy;
+    s.Lx = C.L[0];
+    s.Ly = C.L[1];
+    s.Lz = C.L[2];
+    s.Px = C.P[0];
+    s.Py = C.P[1];
+    s.Pz = C.P[2];
+    return s;
+}
+
+void exportCSV(const SimulationResult& result, const std::string& outputPath)
+{
+    std::filesystem::path outPath(outputPath);
+    if (outPath.has_parent_path())
+        std::filesystem::create_directories(outPath.parent_path());
+
+    std::ofstream file(outputPath);
+    if (!file)
+    {
+        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
+        return;
+    }
+
+    std::string conservPath =
+        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
+    std::ofstream conservFile(conservPath);
+    if (!conservFile)
+        std::cerr << "⚠️ Could not open conservation file: " << conservPath << "\n";
+
+    // Metadata comment
+    file << "# dt=" << result.dt << " stride=" << result.stride << " bodies=";
+    for (std::size_t i = 0; i < result.body_names.size(); ++i)
+    {
+        file << result.body_names[i];
+        if (!result.body_masses.empty())
+            file << ":" << result.body_masses[i];
+        if (i + 1 < result.body_names.size())
+            file << ",";
+    }
+    file << "\n";
+
+    // Headers
+    if (result.is_adaptive)
+    {
+        file << "time_s";
+        for (const auto& name : result.body_names)
+            file << ",x_" << name << ",y_" << name << ",z_" << name;
+        file << ",dt_used\n";
+
+        if (conservFile)
+            conservFile << "time_s,E_total,KE,PE,Lmag,Pmag,dE_rel,dL_rel,dP_rel\n";
+    }
+    else
+    {
+        file << "step";
+        for (const auto& name : result.body_names)
+            file << ",x_" << name << ",y_" << name << ",z_" << name;
+        file << "\n";
+
+        if (conservFile)
+            conservFile << "step,E_total,KE,PE,Lx,Ly,Lz,Lmag,Px,Py,Pz,Pmag,dE_rel,dL_rel,dP_rel\n";
+    }
+
+    // Data rows
+    for (const auto& snap : result.snapshots)
+    {
+        const auto& c = snap.conservation;
+
+        // Positions row
+        if (result.is_adaptive)
+        {
+            file << snap.time_s;
+            for (const auto& pos : snap.positions)
+                file << "," << pos.x() << "," << pos.y() << "," << pos.z();
+            file << "," << snap.dt_used << "\n";
+        }
+        else
+        {
+            file << snap.step;
+            for (const auto& pos : snap.positions)
+                file << "," << pos.x() << "," << pos.y() << "," << pos.z();
+            file << "\n";
+        }
+
+        // Conservation row
+        if (conservFile)
+        {
+            if (result.is_adaptive)
+            {
+                conservFile << snap.time_s << "," << c.total_energy << "," << c.kinetic_energy
+                            << "," << c.potential_energy << "," << c.Lmag << "," << c.Pmag << ","
+                            << c.dE << "," << c.dL << "," << c.dP << "\n";
+            }
+            else
+            {
+                conservFile << snap.step << "," << c.total_energy << "," << c.kinetic_energy << ","
+                            << c.potential_energy << "," << c.Lx << "," << c.Ly << "," << c.Lz
+                            << "," << c.Lmag << "," << c.Px << "," << c.Py << "," << c.Pz << ","
+                            << c.Pmag << "," << c.dE << "," << c.dL << "," << c.dP << "\n";
+            }
+        }
+    }
+
+    file.close();
+    if (conservFile)
+        conservFile.close();
+
+    std::cout << "✅ Positions:    " << outputPath << "\n";
+    std::cout << "✅ Conservation: " << conservPath << "\n";
+}
+
 /********************
  * runSimulation
  * @brief: Generic N-body simulation runner using RK4 integrator.
@@ -269,173 +381,409 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
 
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    // ---------------------------------------------
-    // Optional eclipse logging for Sun–Earth–Moon
-    // ---------------------------------------------
+    // ── Eclipse logging (Sun–Earth–Moon only) ────────────────────────────────
     int idxSun, idxEarth, idxMoon;
     bool isSEM = detectSEM(bodies, idxSun, idxEarth, idxMoon);
 
     std::ofstream eclipseFile;
     if (isSEM)
     {
-        // Derive eclipse log path from the output path
-        // results/earth_moon.csv → results/earth_moon_eclipse.csv
         std::filesystem::path p(outputPath);
         std::string eclipsePath = (p.parent_path() / (p.stem().string() + "_eclipse.csv")).string();
         eclipseFile.open(eclipsePath);
-
         if (!eclipseFile)
         {
             std::cerr << "⚠️ Could not open eclipse log file: " << eclipsePath << "\n";
-            isSEM = false; // disable logging if file failed
+            isSEM = false;
         }
         else
         {
-            eclipseFile << "step,"
-                        << "shadow_x,shadow_y,shadow_z,"
-                        << "umbraRadius,penumbraRadius,eclipseType\n";
-
+            eclipseFile
+                << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
             std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
         }
     }
 
-    // ============================
-    // Auto-create output directory
-    // ============================
-    std::filesystem::path outPath(outputPath);
-    if (outPath.has_parent_path())
-        std::filesystem::create_directories(outPath.parent_path());
-
-    // ============================
-    // Open positions file (viewer reads this)
-    // ============================
-    std::ofstream file(outputPath);
-    if (!file)
-    {
-        std::cerr << "❌ Could not open output file: " << outputPath << "\n";
-        return;
-    }
-
-    // ============================
-    // Open conservation file (Python reads this)
-    // ============================
-    std::string conservPath =
-        (outPath.parent_path() / (outPath.stem().string() + "_conservation.csv")).string();
-
-    std::ofstream conservFile(conservPath);
-    if (!conservFile)
-        std::cerr << "⚠️ Could not open conservation file: " << conservPath << "\n";
-
-    // ============================
-    // Metadata comment — positions file only
-    // ============================
-    file << "# stride=" << stride << " dt=" << dt << " bodies=";
-    for (std::size_t i = 0; i < bodies.size(); ++i)
-    {
-        file << bodies[i].name << ":" << bodies[i].mass;
-        if (i + 1 < bodies.size())
-            file << ",";
-    }
-    file << "\n";
-
-    // ============================
-    // Positions header — no conservation columns
-    // ============================
-    file << "step";
-    for (const auto& b : bodies)
-        file << ",x_" << b.name << ",y_" << b.name << ",z_" << b.name;
-    file << "\n";
-
-    // ============================
-    // Conservation header — separate file
-    // ============================
-    if (conservFile)
-    {
-        conservFile << "step"
-                    << ",E_total,KE,PE"
-                    << ",Lx,Ly,Lz,Lmag"
-                    << ",Px,Py,Pz,Pmag"
-                    << ",dE_rel,dL_rel,dP_rel"
-                    << "\n";
-    }
-
-    // ============================
-    // Seed accelerations for leapfrog before the loop
-    // ============================
+    // ── Seed accelerations for leapfrog ──────────────────────────────────────
     if (integrator == Integrator::Leapfrog)
         updateAccelerations(bodies);
 
-    // ============================
-    // Main Integration Loop
-    // ============================
+    // ── Build result metadata ─────────────────────────────────────────────────
+    SimulationResult result;
+    result.dt = dt;
+    result.stride = stride;
+    result.body_names.reserve(bodies.size());
+    result.body_masses.reserve(bodies.size());
+    for (const auto& b : bodies)
+    {
+        result.body_names.push_back(b.name);
+        result.body_masses.push_back(b.mass);
+    }
+
+    // ── Main integration loop ─────────────────────────────────────────────────
     for (int i = 0; i < steps; ++i)
     {
-        // --- Single integration step ---
         if (integrator == Integrator::Leapfrog)
             leapfrogStep(bodies, dt);
         else
             rk4Step(bodies, dt);
 
-        // Only write to CSV every `stride` steps
         if (i % stride != 0)
             continue;
 
-        // --- Compute updated conservation values ---
         physics::Conservations C = physics::compute(bodies);
+        ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0mag);
 
-        double Lmag = std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
+        std::vector<vec3> pos;
+        pos.reserve(bodies.size());
+        for (const auto& b : bodies)
+            pos.push_back(b.position);
+        result.snapshots.push_back({i, i * dt, 0.0, pos, snap});
 
-        double Pmag = std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
-
-        double dE = (C.total_energy - E0) / std::abs(E0);
-        double dL = (Lmag - L0) / L0;
-        double dP = (Pmag - P0mag) / (P0mag == 0 ? 1.0 : P0mag);
-
-        // ---------------------------------------------
-        // Eclipse logging (Sun–Earth–Moon only)
-        // ---------------------------------------------
         if (isSEM)
         {
-            const vec3& S = bodies[idxSun].position;
-            const vec3& E = bodies[idxEarth].position;
-            const vec3& M = bodies[idxMoon].position;
-
-            EclipseResult e = computeSolarEclipse(S, E, M);
-
+            EclipseResult e = computeSolarEclipse(
+                bodies[idxSun].position, bodies[idxEarth].position, bodies[idxMoon].position);
             eclipseFile << i << "," << e.shadowCenter.x() << "," << e.shadowCenter.y() << ","
                         << e.shadowCenter.z() << "," << e.umbraRadius << "," << e.penumbraRadius
                         << "," << e.eclipseType << "\n";
         }
+    }
 
-        // ============================
-        // CSV ROW (main orbit data)
-        // ============================
-        // Positions row
-        file << i;
-        for (const auto& b : bodies)
-            file << "," << b.position.x() << "," << b.position.y() << "," << b.position.z();
-        file << "\n";
+    if (isSEM)
+        eclipseFile.close();
 
-        // Conservation row — write less frequently
-        if (conservFile && i % (stride * 10) == 0)
+    exportCSV(result, outputPath);
+}
+// ============================================================================
+// RK45 Dormand-Prince Adaptive Integrator
+// ============================================================================
+
+/***********************
+ * buildIntermediateStateMulti
+ * @brief: Builds an intermediate RK state from a linear combination of
+ *         multiple derivative stages.
+ *
+ * Computes: result = base + dt * sum_i(weight_i * k_i)
+ *
+ * This is the generalization of buildIntermediateState() needed for
+ * RK45 stages 3-6, which each depend on multiple previous k vectors.
+ *
+ * Physical meaning: we're estimating where the system will be at some
+ * intermediate time by combining multiple derivative estimates, each
+ * weighted by the Butcher tableau coefficients.
+ *
+ * @param base     Starting state (y_n)
+ * @param weighted List of (coefficient, derivative_vector) pairs
+ * @param dt       Timestep
+ * @return         Intermediate state
+ ***********************/
+std::vector<CelestialBody> buildIntermediateStateMulti(
+    const std::vector<CelestialBody>& base,
+    const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted, double dt)
+{
+    std::vector<CelestialBody> result = base;
+
+    for (std::size_t i = 0; i < base.size(); ++i)
+    {
+        vec3 dpos(0, 0, 0);
+        vec3 dvel(0, 0, 0);
+
+        for (const auto& [coeff, k] : weighted)
         {
-            conservFile << i << "," << C.total_energy << "," << C.kinetic_energy << ","
-                        << C.potential_energy << "," << C.L[0] << "," << C.L[1] << "," << C.L[2]
-                        << "," << Lmag << "," << C.P[0] << "," << C.P[1] << "," << C.P[2] << ","
-                        << Pmag << "," << dE << "," << dL << "," << dP << "\n";
+            dpos += coeff * (*k)[i].dpos;
+            dvel += coeff * (*k)[i].dvel;
+        }
+
+        result[i].position += dt * dpos;
+        result[i].velocity += dt * dvel;
+    }
+
+    return result;
+}
+
+/***********************
+ * computeErrorNorm
+ * @brief: Computes the scaled RMS error norm for adaptive step control.
+ *
+ * For each coordinate of each body:
+ *   sc_i = atol + rtol * max(|y_old_i|, |y_new_i|)
+ *   err_i = error_i / sc_i
+ *
+ * Returns sqrt(mean(err_i^2))
+ *
+ * If < 1.0 → step is within tolerance (accept)
+ * If >= 1.0 → step exceeds tolerance (reject, shrink dt)
+ *
+ * The scaling by sc_i makes the norm dimensionless, so position
+ * error (in meters ~1e11) and velocity error (m/s ~1e4) are treated
+ * fairly relative to their own magnitudes.
+ ***********************/
+double computeErrorNorm(const std::vector<CelestialBody>& y_old,
+                        const std::vector<CelestialBody>& y_new,
+                        const std::vector<CelestialBody>& err, double atol, double rtol)
+{
+    double sum = 0.0;
+    int n = 0;
+
+    for (std::size_t i = 0; i < y_old.size(); ++i)
+    {
+        // Position components
+        for (int j = 0; j < 3; ++j)
+        {
+            double yo = y_old[i].position[j];
+            double yn = y_new[i].position[j];
+            double e = err[i].position[j];
+            double sc = atol + rtol * std::max(std::abs(yo), std::abs(yn));
+            sum += (e / sc) * (e / sc);
+            ++n;
+        }
+
+        // Velocity components
+        for (int j = 0; j < 3; ++j)
+        {
+            double yo = y_old[i].velocity[j];
+            double yn = y_new[i].velocity[j];
+            double e = err[i].velocity[j];
+            double sc = atol + rtol * std::max(std::abs(yo), std::abs(yn));
+            sum += (e / sc) * (e / sc);
+            ++n;
         }
     }
 
-    file.close();
-    if (conservFile)
-        conservFile.close();
+    return std::sqrt(sum / n);
+}
 
-    std::cout << "✅ Positions:     " << outputPath << "\n";
-    std::cout << "✅ Conservation:  " << conservPath << "\n";
-    if (isSEM)
+/***********************
+ * rk45Step
+ * @brief: One adaptive Dormand-Prince RK45 step.
+ *
+ * Computes six derivative stages (k1-k6) using the Dormand-Prince
+ * Butcher tableau, then:
+ *   - y5: 5th-order solution (accepted state if step passes)
+ *   - err: difference between 4th and 5th order solutions (error estimate)
+ *
+ * The error norm determines whether to accept or reject the step,
+ * and suggests the next timestep via the standard scaling formula:
+ *   dt_next = dt * safety * (1/error_norm)^(1/5)
+ *
+ * FSAL property: k6 evaluated at y5 = k1 of the next step.
+ * This saves one force evaluation per accepted step.
+ * (Not yet exploited here — left as future optimization.)
+ *
+ * @param bodies  System state (modified in place if step accepted)
+ * @param dt      Proposed timestep
+ * @param atol    Absolute tolerance (meters / m/s)
+ * @param rtol    Relative tolerance (dimensionless)
+ * @return        RK45StepResult with acceptance flag and next dt suggestion
+ ***********************/
+RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol, double rtol)
+{
+    using namespace dp45;
+
+    // ── Stage 1: k1 at current state ─────────────────────────────────────────
+    auto k1 = evaluateDerivatives(bodies);
+
+    // ── Stage 2: k2 at t + C2*dt ─────────────────────────────────────────────
+    auto s2 = buildIntermediateState(bodies, k1, dt * A21);
+    auto k2 = evaluateDerivatives(s2);
+
+    // ── Stage 3: k3 at t + C3*dt ─────────────────────────────────────────────
+    auto s3 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A31, &k1},
+                                              {A32, &k2},
+                                          },
+                                          dt);
+    auto k3 = evaluateDerivatives(s3);
+
+    // ── Stage 4: k4 at t + C4*dt ─────────────────────────────────────────────
+    auto s4 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A41, &k1},
+                                              {A42, &k2},
+                                              {A43, &k3},
+                                          },
+                                          dt);
+    auto k4 = evaluateDerivatives(s4);
+
+    // ── Stage 5: k5 at t + C5*dt ─────────────────────────────────────────────
+    auto s5 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A51, &k1},
+                                              {A52, &k2},
+                                              {A53, &k3},
+                                              {A54, &k4},
+                                          },
+                                          dt);
+    auto k5 = evaluateDerivatives(s5);
+
+    // ── Stage 6: k6 at t + dt ────────────────────────────────────────────────
+    auto s6 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A61, &k1},
+                                              {A62, &k2},
+                                              {A63, &k3},
+                                              {A64, &k4},
+                                              {A65, &k5},
+                                          },
+                                          dt);
+    auto k6 = evaluateDerivatives(s6);
+
+    // ── 5th-order solution y5 ─────────────────────────────────────────────────
+    // y5 = y_n + dt*(B1*k1 + B3*k3 + B4*k4 + B5*k5 + B6*k6)
+    // B2 = 0 so k2 does not appear
+    auto y5 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {B1, &k1},
+                                              {B3, &k3},
+                                              {B4, &k4},
+                                              {B5, &k5},
+                                              {B6, &k6},
+                                          },
+                                          dt);
+
+    // ── k7 at y5 (FSAL: this will be k1 of the next step) ────────────────────
+    auto k7 = evaluateDerivatives(y5);
+
+    // ── Error estimate: y5 - y4 ───────────────────────────────────────────────
+    // err = dt*(E1*k1 + E3*k3 + E4*k4 + E5*k5 + E6*k6 + E7*k7)
+    // We store the error as a CelestialBody vector for computeErrorNorm
+    auto err_state = buildIntermediateStateMulti(bodies,
+                                                 {
+                                                     {E1, &k1},
+                                                     {E3, &k3},
+                                                     {E4, &k4},
+                                                     {E5, &k5},
+                                                     {E6, &k6},
+                                                     {E7, &k7},
+                                                 },
+                                                 dt);
+
+    // err_state currently holds: bodies + dt*(error terms)
+    // We need just the delta: subtract bodies to get the error vector
+    std::vector<CelestialBody> err_delta = err_state;
+    for (std::size_t i = 0; i < bodies.size(); ++i)
     {
-        eclipseFile.close();
+        err_delta[i].position = err_state[i].position - bodies[i].position;
+        err_delta[i].velocity = err_state[i].velocity - bodies[i].velocity;
     }
 
-    std::cout << "✅ Simulation complete: " << outputPath << "\n";
+    // ── Error norm and step control ───────────────────────────────────────────
+    double error_norm = computeErrorNorm(bodies, y5, err_delta, atol, rtol);
+
+    double scale = SAFETY * std::pow(1.0 / std::max(error_norm, 1e-10), EXP);
+    scale = std::clamp(scale, MIN_SCALE, MAX_SCALE);
+    double dt_next = dt * scale;
+
+    RK45StepResult result;
+    result.error_norm = error_norm;
+    result.dt_next = dt_next;
+
+    if (error_norm <= 1.0)
+    {
+        // Accept: advance bodies to y5
+        bodies = y5;
+        result.accepted = true;
+        result.dt_used = dt;
+    }
+    // If rejected: bodies unchanged, caller retries with dt_next
+
+    return result;
+}
+
+/***********************
+ * runSimulationAdaptive
+ * @brief: Adaptive RK45 simulation runner.
+ *
+ * Unlike runSimulation() which uses a fixed step count,
+ * this runs until t >= duration_s, writing output every
+ * output_interval_s seconds of simulated time.
+ *
+ * @param bodies            System to simulate (modified in place)
+ * @param duration_s        Total simulated time in seconds
+ * @param dt_initial        Starting timestep guess
+ * @param outputPath        CSV output file path
+ * @param output_interval_s Write a CSV row every N simulated seconds
+ * @param atol              Absolute tolerance (m / m/s)
+ * @param rtol              Relative tolerance (dimensionless)
+ * @param dt_min            Minimum allowed timestep
+ * @param dt_max            Maximum allowed timestep
+ ***********************/
+void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
+                           const std::string& outputPath, double output_interval_s, double atol,
+                           double rtol, double dt_min, double dt_max)
+{
+    if (bodies.empty())
+    {
+        std::cerr << "❌ No bodies to simulate.\n";
+        return;
+    }
+
+    // ── Conservation baseline ─────────────────────────────────────────────────
+    physics::Conservations C0 = physics::compute(bodies);
+    double E0 = C0.total_energy;
+    double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
+    double P0 = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
+
+    // ── Build result metadata ─────────────────────────────────────────────────
+    SimulationResult sim_result;
+    sim_result.dt = dt_initial;
+    sim_result.is_adaptive = true;
+    sim_result.body_names.reserve(bodies.size());
+    sim_result.body_masses.reserve(bodies.size());
+    for (const auto& b : bodies)
+    {
+        sim_result.body_names.push_back(b.name);
+        sim_result.body_masses.push_back(b.mass);
+    }
+
+    // ── Adaptive loop ─────────────────────────────────────────────────────────
+    double t = 0.0;
+    double dt = dt_initial;
+    double next_output = 0.0;
+    int n_steps = 0;
+    int n_rejected = 0;
+
+    while (t < duration_s)
+    {
+        if (t + dt > duration_s)
+            dt = duration_s - t;
+
+        auto step = rk45Step(bodies, dt, atol, rtol);
+
+        if (step.accepted)
+        {
+            t += step.dt_used;
+            ++n_steps;
+
+            if (t >= next_output)
+            {
+                physics::Conservations C = physics::compute(bodies);
+                ConservationSnapshot snap = computeSnapshot(C, E0, L0, P0);
+
+                std::vector<vec3> pos;
+                pos.reserve(bodies.size());
+                for (const auto& b : bodies)
+                    pos.push_back(b.position);
+                sim_result.snapshots.push_back({0, t, step.dt_used, pos, snap});
+
+                next_output += output_interval_s;
+            }
+        }
+        else
+        {
+            ++n_rejected;
+        }
+
+        dt = std::clamp(step.dt_next, dt_min, dt_max);
+    }
+
+    double reject_pct = 100.0 * n_rejected / std::max(1, n_steps + n_rejected);
+    std::cout << "✅ RK45 complete:\n"
+              << "   Steps accepted: " << n_steps << "\n"
+              << "   Steps rejected: " << n_rejected << " (" << reject_pct << "%)\n"
+              << "   Final dt:       " << dt << " s\n";
+
+    exportCSV(sim_result, outputPath);
 }
