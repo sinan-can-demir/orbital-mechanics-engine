@@ -1,215 +1,181 @@
-# 🌍 Orbital Mechanics Engine
+# Orbital Mechanics Engine
 
-A modern **C++17 N-body orbital mechanics simulator** with:
-- **RK4 integration** for Newtonian gravity
-- **OpenGL viewer** for 3D orbit visualization
-- **NASA JPL HORIZONS** ephemeris import
-- **Eclipse detection** and conservation monitoring
+A high-performance **C++17 N-body gravitational simulator** with adaptive integration, real ephemeris support, and a Python API.
 
----
-
-## 🚀 What it does
-
-This repository simulates gravitational systems of planets, moons, and custom bodies using a fixed-step Runge-Kutta 4 integrator.
-It supports JSON-defined system configurations, exports CSV trajectories, and provides tools for real-world ephemeris comparison and Python plotting.
-
-The engine is built to be:
-- accurate enough for short-term orbital propagation
-- modular for new system definitions and validation
-- easy to run from the provided `Makefile`
+[![CI](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
-## ✨ Key features
+## Features
 
-- **N-body Newtonian gravity**
-- **Fixed-step RK4 integration**
-- **Energy, linear momentum, and angular momentum tracking**
-- **Barycenter utilities**
-- **Umbra / penumbra eclipse detection**
-- **JSON system files** for solar system, Earth-Moon, and custom scenarios
-- **HORIZONS fetch / system-builder** support
-- **OpenGL orbit viewer** with camera controls
-- **Python plotting scripts** for analysis and visualization
-
----
-
-## 📁 Repository layout
-
-- `include/` — public headers and utilities
-- `src/` — core simulation, I/O, CLI, and viewer code
-- `systems/` — JSON orbital system definitions
-- `results/` — generated simulation outputs and data
-- `python/` — plotting and analysis scripts
-- `tests/` — test suites
-- `Makefile` — project automation and build targets
-- `CMakeLists.txt` — CMake build configuration
-
-For code organization and module boundary guidelines, see
-`docs/architecture.md`.
+- **Three integrators** — RK4 (fixed-step), Leapfrog (symplectic), and RK45 Dormand-Prince (adaptive timestep)
+- **Full N-body Newtonian gravity** — arbitrary number of bodies, pairwise forces, Newton's third law
+- **Conservation monitoring** — energy, linear momentum, and angular momentum tracked at every step
+- **NASA JPL HORIZONS integration** — fetch real ephemeris data and build system files automatically
+- **Eclipse detection** — umbra, penumbra, and antumbra cone geometry
+- **Python API** — run simulations and access results as NumPy arrays with `pip install -e .`
+- **OpenGL viewer** — real-time 3D orbit visualization with camera controls
+- **CLI** — `orbit-sim run`, `validate`, `fetch`, `build-system`, and more
 
 ---
 
-## 🛠 Requirements
+## Quick start
 
-- C++17 compiler
-- CMake ≥ 3.14
-- OpenGL 3.3 (for viewer)
-- `glad`, `glfw`, `glm`
-- `libcurl`
-- Python 3 (optional, for plotting)
-
----
-
-## 🚧 Build
-
-### Standard build
+### Python API
 
 ```bash
 git clone https://github.com/sinan-can-demir/orbital-mechanics-engine.git
 cd orbital-mechanics-engine
-make
+mkdir build && cmake -S . -B build && cmake --build build --parallel
+pip install -e . --no-build-isolation
 ```
 
-### Build only the simulator
+```python
+import orbit
+import numpy as np
 
-```bash
-make build-sim
+result = orbit.simulate('systems/solar_system.json', steps=8760, dt=3600.0)
+
+pos = result.positions_numpy()   # shape: (n_steps, n_bodies, 3)  metres
+E   = result.energies_numpy()    # shape: (n_steps,)               Joules
+
+print(result.body_names)         # ['Sun', 'Mercury', 'Venus', ...]
+print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-10
 ```
 
-### Build only the viewer
+### CLI
 
 ```bash
-make build-viewer
-```
-
-### Build without the OpenGL viewer
-
-```bash
-make BUILD_VIEWER=0 build
-```
-
-### Manual CMake build
-
-```bash
-mkdir -p build && cd build
-cmake -S .. -B . -DBUILD_VIEWER=ON
-cmake --build . --parallel
+./build/orbit-sim run \
+    --system systems/solar_system.json \
+    --integrator rk4 \
+    --steps 8760 --dt 3600 \
+    --output results/solar_system.csv
 ```
 
 ---
 
-## ▶️ Run simulations
+## Requirements
 
-### Default simulation
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| C++ compiler | C++17 | Core simulation |
+| CMake | ≥ 3.14 | Build system |
+| Python | ≥ 3.10 | Python bindings |
+| pybind11 | 2.13 | Fetched automatically via CMake |
+| libcurl | any | HORIZONS ephemeris fetch |
+| OpenGL / GLFW / GLM | 3.3 | Viewer (optional) |
+
+pybind11 is downloaded automatically at configure time — no manual install needed.
+
+---
+
+## Build
+
+### With Make (recommended)
 
 ```bash
-make run
+make              # build everything (simulator + viewer + Python bindings)
+make BUILD_VIEWER=0 build   # headless build (CI / no OpenGL)
+make help         # list all available targets
 ```
 
-### Earth-Moon simulation
+### With CMake directly
 
 ```bash
-make run-earth-moon
+mkdir build
+cmake -S . -B build
+cmake --build build --parallel
 ```
 
-### Solar System simulation
+### Python bindings
 
 ```bash
-make run-solar-system
+pip install -e . --no-build-isolation
 ```
 
-### Validate a system file
+### Run the test suite
 
 ```bash
-make validate
-```
-
-### Quick test
-
-```bash
-make test
+cd build && ctest --output-on-failure
 ```
 
 ---
 
-## 🎥 Viewer
+## Python API
 
-Launch the viewer with default output:
+After `pip install -e .`, the `orbit` module is available system-wide.
 
-```bash
-make view
+```python
+import orbit
+
+# Run a simulation
+result = orbit.simulate(path, steps, dt)
+
+# Access results
+result.body_names          # list of body names
+result.body_masses         # list of masses in kg
+result.snapshots           # list of SimulationSnapshot objects
+result.positions_numpy()   # NumPy array (n_steps, n_bodies, 3)
+result.energies_numpy()    # NumPy array (n_steps,)
 ```
 
-View the most recent simulation output:
+See [examples/01_solar_system.ipynb](examples/01_solar_system.ipynb) for a full walkthrough.
+
+---
+
+## Examples
+
+Jupyter notebooks are in `examples/`. Execute all cells with:
 
 ```bash
-make view-last
+jupyter nbconvert --to notebook --execute examples/01_solar_system.ipynb \
+    --output 01_solar_system.ipynb --output-dir examples/
 ```
 
-You can also run the viewer script directly:
+| Notebook | Description |
+|----------|-------------|
+| [01_solar_system.ipynb](examples/01_solar_system.ipynb) | Full solar system — orbital trajectories and energy conservation |
 
-```bash
-./utils/view.sh
+---
+
+## Repository layout
+
+```
+include/          public headers
+src/
+  core/           simulation, integrators, conservation
+  cli/            orbit-sim command-line interface
+  viewer/         OpenGL 3D viewer
+orbit_py/         pybind11 Python bindings
+systems/          JSON orbital system definitions
+examples/         Jupyter notebook examples
+tests/            C++ and Python test suites
+docs/             architecture, validation, and roadmap
 ```
 
 ---
 
-## 🌌 HORIZONS and system generation
+## HORIZONS system builder
 
-Fetch ephemeris data from JPL HORIZONS using:
-
-```bash
-make fetch
-```
-
-Generate JSON system files from HORIZONS data:
+Fetch real initial conditions from NASA JPL HORIZONS and build a system file:
 
 ```bash
-make build-earth-moon
-make build-solar-system
-```
-
-Run a full Earth-Moon pipeline and open the viewer:
-
-```bash
-make pipeline-earth-moon
+make build-earth-moon       # fetch Earth + Moon from HORIZONS → systems/earth_moon_horizons.json
+make build-solar-system     # fetch all 8 planets + Moon      → systems/solar_system_horizons.json
+make pipeline-earth-moon    # fetch → simulate → open viewer in one step
 ```
 
 ---
 
-## 📊 Python visualization
+## License
 
-The `python/` folder contains plotting scripts for analysis and visualization.
-
-```bash
-make plot
-make plot-energy
-make plot-momentum
-make plot-3d
-make plot-3d-exaggerated
-make plot-3d-earth-moon
-```
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-## ✅ Helpful make targets
+## Author
 
-- `make clean` — remove the build directory
-- `make reconfigure` — recreate build files
-- `make format` — run `clang-format` on source files
-- `make format-check` — verify formatting
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License.
-
----
-
-## 👨‍🚀 Author
-
-**Sinan Can Demir**
-
-GitHub: https://github.com/sinan-can-demir
+**Sinan Can Demir**  
+GitHub: [sinan-can-demir](https://github.com/sinan-can-demir)
