@@ -38,6 +38,7 @@ NC               := \033[0m
 .PHONY: plot plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
 .PHONY: build-earth-moon build-solar-system pipeline-earth-moon
 .PHONY: format format-check
+.PHONY: python-install python-test python-check
 
 # Default target
 all: build
@@ -191,6 +192,22 @@ plot-3d-earth-moon:
 	@cd $(SCRIPTS_DIR) && $(PYTHON) 3Dplot_earth_moon.py
 
 # ========================================
+# PYTHON BINDINGS TARGETS
+# ========================================
+
+python-install:
+	@echo "$(BLUE)Installing Python bindings...$(NC)"
+	pip install -e . --no-build-isolation -q
+	@echo "$(GREEN)Python bindings installed.$(NC)"
+
+python-test:
+	@echo "$(BLUE)Running Python API tests...$(NC)"
+	pytest tests/test_python_api.py -v
+
+python-check: python-install python-test
+	@echo "$(GREEN)Python bindings check complete.$(NC)"
+
+# ========================================
 # FORMATTING TARGETS
 # ========================================
 
@@ -249,6 +266,11 @@ help:
 	@echo "    make plot-3d            - 3D orbit visualization"
 	@echo "    make plot-3d-exaggerated - 3D with exaggerated scale"
 	@echo "    make plot-3d-earth-moon - Earth-Moon 3D plot"
+	@echo ""
+	@echo "  Python Bindings Targets:"
+	@echo "    make python-install     - pip install -e . (build and install Python module)"
+	@echo "    make python-test        - Run pytest tests/test_python_api.py"
+	@echo "    make python-check       - Install + test in one step"
 	@echo ""
 	@echo "    make format             - Auto-format all source files"
 	@echo "    make format-check       - Check formatting (CI style)"
