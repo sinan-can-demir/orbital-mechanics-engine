@@ -229,20 +229,24 @@ bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEa
     return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
 }
 
-ConservationSnapshot computeSnapshot(const physics::Conservations& C,
-                                     double E0, double L0, double P0)
+ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0, double L0,
+                                     double P0)
 {
     ConservationSnapshot s;
-    s.Lmag            = std::sqrt(C.L[0]*C.L[0] + C.L[1]*C.L[1] + C.L[2]*C.L[2]);
-    s.Pmag            = std::sqrt(C.P[0]*C.P[0] + C.P[1]*C.P[1] + C.P[2]*C.P[2]);
-    s.dE              = (C.total_energy - E0) / std::abs(E0);
-    s.dL              = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
-    s.dP              = (s.Pmag - P0) / (P0  == 0.0 ? 1.0 : P0);
-    s.total_energy    = C.total_energy;
-    s.kinetic_energy  = C.kinetic_energy;
+    s.Lmag = std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
+    s.Pmag = std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
+    s.dE = (C.total_energy - E0) / std::abs(E0);
+    s.dL = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
+    s.dP = (s.Pmag - P0) / (P0 == 0.0 ? 1.0 : P0);
+    s.total_energy = C.total_energy;
+    s.kinetic_energy = C.kinetic_energy;
     s.potential_energy = C.potential_energy;
-    s.Lx = C.L[0]; s.Ly = C.L[1]; s.Lz = C.L[2];
-    s.Px = C.P[0]; s.Py = C.P[1]; s.Pz = C.P[2];
+    s.Lx = C.L[0];
+    s.Ly = C.L[1];
+    s.Lz = C.L[2];
+    s.Px = C.P[0];
+    s.Py = C.P[1];
+    s.Pz = C.P[2];
     return s;
 }
 
@@ -272,7 +276,8 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
         file << result.body_names[i];
         if (!result.body_masses.empty())
             file << ":" << result.body_masses[i];
-        if (i + 1 < result.body_names.size()) file << ",";
+        if (i + 1 < result.body_names.size())
+            file << ",";
     }
     file << "\n";
 
@@ -324,24 +329,23 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
         {
             if (result.is_adaptive)
             {
-                conservFile << snap.time_s << ","
-                            << c.total_energy << "," << c.kinetic_energy << "," << c.potential_energy << ","
-                            << c.Lmag << "," << c.Pmag << ","
+                conservFile << snap.time_s << "," << c.total_energy << "," << c.kinetic_energy
+                            << "," << c.potential_energy << "," << c.Lmag << "," << c.Pmag << ","
                             << c.dE << "," << c.dL << "," << c.dP << "\n";
             }
             else
             {
-                conservFile << snap.step << ","
-                            << c.total_energy << "," << c.kinetic_energy << "," << c.potential_energy << ","
-                            << c.Lx << "," << c.Ly << "," << c.Lz << "," << c.Lmag << ","
-                            << c.Px << "," << c.Py << "," << c.Pz << "," << c.Pmag << ","
-                            << c.dE << "," << c.dL << "," << c.dP << "\n";
+                conservFile << snap.step << "," << c.total_energy << "," << c.kinetic_energy << ","
+                            << c.potential_energy << "," << c.Lx << "," << c.Ly << "," << c.Lz
+                            << "," << c.Lmag << "," << c.Px << "," << c.Py << "," << c.Pz << ","
+                            << c.Pmag << "," << c.dE << "," << c.dL << "," << c.dP << "\n";
             }
         }
     }
 
     file.close();
-    if (conservFile) conservFile.close();
+    if (conservFile)
+        conservFile.close();
 
     std::cout << "✅ Positions:    " << outputPath << "\n";
     std::cout << "✅ Conservation: " << conservPath << "\n";
@@ -394,7 +398,8 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         }
         else
         {
-            eclipseFile << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
+            eclipseFile
+                << "step,shadow_x,shadow_y,shadow_z,umbraRadius,penumbraRadius,eclipseType\n";
             std::cout << "🌓 Eclipse logging enabled → " << eclipsePath << "\n";
         }
     }
@@ -405,7 +410,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
 
     // ── Build result metadata ─────────────────────────────────────────────────
     SimulationResult result;
-    result.dt     = dt;
+    result.dt = dt;
     result.stride = stride;
     result.body_names.reserve(bodies.size());
     result.body_masses.reserve(bodies.size());
@@ -452,7 +457,8 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         }
     }
 
-    if (isSEM) eclipseFile.close();
+    if (isSEM)
+        eclipseFile.close();
 
     exportCSV(result, outputPath);
 }
@@ -481,8 +487,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
  ***********************/
 std::vector<CelestialBody> buildIntermediateStateMulti(
     const std::vector<CelestialBody>& base,
-    const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted,
-    double dt)
+    const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted, double dt)
 {
     std::vector<CelestialBody> result = base;
 
@@ -521,15 +526,12 @@ std::vector<CelestialBody> buildIntermediateStateMulti(
  * error (in meters ~1e11) and velocity error (m/s ~1e4) are treated
  * fairly relative to their own magnitudes.
  ***********************/
-double computeErrorNorm(
-    const std::vector<CelestialBody>& y_old,
-    const std::vector<CelestialBody>& y_new,
-    const std::vector<CelestialBody>& err,
-    double atol,
-    double rtol)
+double computeErrorNorm(const std::vector<CelestialBody>& y_old,
+                        const std::vector<CelestialBody>& y_new,
+                        const std::vector<CelestialBody>& err, double atol, double rtol)
 {
     double sum = 0.0;
-    int    n   = 0;
+    int n = 0;
 
     for (std::size_t i = 0; i < y_old.size(); ++i)
     {
@@ -538,7 +540,7 @@ double computeErrorNorm(
         {
             double yo = y_old[i].position[j];
             double yn = y_new[i].position[j];
-            double e  = err[i].position[j];
+            double e = err[i].position[j];
             double sc = atol + rtol * std::max(std::abs(yo), std::abs(yn));
             sum += (e / sc) * (e / sc);
             ++n;
@@ -549,7 +551,7 @@ double computeErrorNorm(
         {
             double yo = y_old[i].velocity[j];
             double yn = y_new[i].velocity[j];
-            double e  = err[i].velocity[j];
+            double e = err[i].velocity[j];
             double sc = atol + rtol * std::max(std::abs(yo), std::abs(yn));
             sum += (e / sc) * (e / sc);
             ++n;
@@ -582,11 +584,7 @@ double computeErrorNorm(
  * @param rtol    Relative tolerance (dimensionless)
  * @return        RK45StepResult with acceptance flag and next dt suggestion
  ***********************/
-RK45StepResult rk45Step(
-    std::vector<CelestialBody>& bodies,
-    double dt,
-    double atol,
-    double rtol)
+RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol, double rtol)
 {
     using namespace dp45;
 
@@ -598,49 +596,59 @@ RK45StepResult rk45Step(
     auto k2 = evaluateDerivatives(s2);
 
     // ── Stage 3: k3 at t + C3*dt ─────────────────────────────────────────────
-    auto s3 = buildIntermediateStateMulti(bodies, {
-        {A31, &k1},
-        {A32, &k2},
-    }, dt);
+    auto s3 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A31, &k1},
+                                              {A32, &k2},
+                                          },
+                                          dt);
     auto k3 = evaluateDerivatives(s3);
 
     // ── Stage 4: k4 at t + C4*dt ─────────────────────────────────────────────
-    auto s4 = buildIntermediateStateMulti(bodies, {
-        {A41, &k1},
-        {A42, &k2},
-        {A43, &k3},
-    }, dt);
+    auto s4 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A41, &k1},
+                                              {A42, &k2},
+                                              {A43, &k3},
+                                          },
+                                          dt);
     auto k4 = evaluateDerivatives(s4);
 
     // ── Stage 5: k5 at t + C5*dt ─────────────────────────────────────────────
-    auto s5 = buildIntermediateStateMulti(bodies, {
-        {A51, &k1},
-        {A52, &k2},
-        {A53, &k3},
-        {A54, &k4},
-    }, dt);
+    auto s5 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A51, &k1},
+                                              {A52, &k2},
+                                              {A53, &k3},
+                                              {A54, &k4},
+                                          },
+                                          dt);
     auto k5 = evaluateDerivatives(s5);
 
     // ── Stage 6: k6 at t + dt ────────────────────────────────────────────────
-    auto s6 = buildIntermediateStateMulti(bodies, {
-        {A61, &k1},
-        {A62, &k2},
-        {A63, &k3},
-        {A64, &k4},
-        {A65, &k5},
-    }, dt);
+    auto s6 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {A61, &k1},
+                                              {A62, &k2},
+                                              {A63, &k3},
+                                              {A64, &k4},
+                                              {A65, &k5},
+                                          },
+                                          dt);
     auto k6 = evaluateDerivatives(s6);
 
     // ── 5th-order solution y5 ─────────────────────────────────────────────────
     // y5 = y_n + dt*(B1*k1 + B3*k3 + B4*k4 + B5*k5 + B6*k6)
     // B2 = 0 so k2 does not appear
-    auto y5 = buildIntermediateStateMulti(bodies, {
-        {B1, &k1},
-        {B3, &k3},
-        {B4, &k4},
-        {B5, &k5},
-        {B6, &k6},
-    }, dt);
+    auto y5 = buildIntermediateStateMulti(bodies,
+                                          {
+                                              {B1, &k1},
+                                              {B3, &k3},
+                                              {B4, &k4},
+                                              {B5, &k5},
+                                              {B6, &k6},
+                                          },
+                                          dt);
 
     // ── k7 at y5 (FSAL: this will be k1 of the next step) ────────────────────
     auto k7 = evaluateDerivatives(y5);
@@ -648,14 +656,16 @@ RK45StepResult rk45Step(
     // ── Error estimate: y5 - y4 ───────────────────────────────────────────────
     // err = dt*(E1*k1 + E3*k3 + E4*k4 + E5*k5 + E6*k6 + E7*k7)
     // We store the error as a CelestialBody vector for computeErrorNorm
-    auto err_state = buildIntermediateStateMulti(bodies, {
-        {E1, &k1},
-        {E3, &k3},
-        {E4, &k4},
-        {E5, &k5},
-        {E6, &k6},
-        {E7, &k7},
-    }, dt);
+    auto err_state = buildIntermediateStateMulti(bodies,
+                                                 {
+                                                     {E1, &k1},
+                                                     {E3, &k3},
+                                                     {E4, &k4},
+                                                     {E5, &k5},
+                                                     {E6, &k6},
+                                                     {E7, &k7},
+                                                 },
+                                                 dt);
 
     // err_state currently holds: bodies + dt*(error terms)
     // We need just the delta: subtract bodies to get the error vector
@@ -675,14 +685,14 @@ RK45StepResult rk45Step(
 
     RK45StepResult result;
     result.error_norm = error_norm;
-    result.dt_next    = dt_next;
+    result.dt_next = dt_next;
 
     if (error_norm <= 1.0)
     {
         // Accept: advance bodies to y5
-        bodies        = y5;
+        bodies = y5;
         result.accepted = true;
-        result.dt_used  = dt;
+        result.dt_used = dt;
     }
     // If rejected: bodies unchanged, caller retries with dt_next
 
@@ -707,16 +717,9 @@ RK45StepResult rk45Step(
  * @param dt_min            Minimum allowed timestep
  * @param dt_max            Maximum allowed timestep
  ***********************/
-void runSimulationAdaptive(
-    std::vector<CelestialBody>& bodies,
-    double duration_s,
-    double dt_initial,
-    const std::string& outputPath,
-    double output_interval_s,
-    double atol,
-    double rtol,
-    double dt_min,
-    double dt_max)
+void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
+                           const std::string& outputPath, double output_interval_s, double atol,
+                           double rtol, double dt_min, double dt_max)
 {
     if (bodies.empty())
     {
@@ -727,12 +730,12 @@ void runSimulationAdaptive(
     // ── Conservation baseline ─────────────────────────────────────────────────
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
-    double L0 = std::sqrt(C0.L[0]*C0.L[0] + C0.L[1]*C0.L[1] + C0.L[2]*C0.L[2]);
-    double P0 = std::sqrt(C0.P[0]*C0.P[0] + C0.P[1]*C0.P[1] + C0.P[2]*C0.P[2]);
+    double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
+    double P0 = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
     // ── Build result metadata ─────────────────────────────────────────────────
     SimulationResult sim_result;
-    sim_result.dt          = dt_initial;
+    sim_result.dt = dt_initial;
     sim_result.is_adaptive = true;
     sim_result.body_names.reserve(bodies.size());
     sim_result.body_masses.reserve(bodies.size());
@@ -743,11 +746,11 @@ void runSimulationAdaptive(
     }
 
     // ── Adaptive loop ─────────────────────────────────────────────────────────
-    double t           = 0.0;
-    double dt          = dt_initial;
+    double t = 0.0;
+    double dt = dt_initial;
     double next_output = 0.0;
-    int    n_steps     = 0;
-    int    n_rejected  = 0;
+    int n_steps = 0;
+    int n_rejected = 0;
 
     while (t < duration_s)
     {
@@ -785,9 +788,9 @@ void runSimulationAdaptive(
 
     double reject_pct = 100.0 * n_rejected / std::max(1, n_steps + n_rejected);
     std::cout << "✅ RK45 complete:\n"
-              << "   Steps accepted: " << n_steps   << "\n"
+              << "   Steps accepted: " << n_steps << "\n"
               << "   Steps rejected: " << n_rejected << " (" << reject_pct << "%)\n"
-              << "   Final dt:       " << dt         << " s\n";
+              << "   Final dt:       " << dt << " s\n";
 
     exportCSV(sim_result, outputPath);
 }

@@ -49,26 +49,24 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
 std::vector<StateDerivative> evaluateStateDerivatives(std::vector<CelestialBody>& bodies);
 
 // Build intermediate state: base + scale * d  (single derivative)
-std::vector<CelestialBody> buildIntermediateState(
-    const std::vector<CelestialBody>& bodies,
-    const std::vector<StateDerivative>& d,
-    double scale);
+std::vector<CelestialBody> buildIntermediateState(const std::vector<CelestialBody>& bodies,
+                                                  const std::vector<StateDerivative>& d,
+                                                  double scale);
 
 // Build intermediate state: base + dt * sum(coeff_i * k_i)
 // Used by RK45 stages 3-6 which combine multiple previous derivatives.
 std::vector<CelestialBody> buildIntermediateStateMulti(
     const std::vector<CelestialBody>& base,
-    const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted,
-    double dt);
+    const std::vector<std::pair<double, const std::vector<StateDerivative>*>>& weighted, double dt);
 
 // ── Conservation snapshot ─────────────────────────────────────────────────────
 struct ConservationSnapshot
 {
-    double dE;    // relative energy drift
-    double dL;    // relative angular momentum drift
-    double dP;    // relative linear momentum drift
-    double Lmag;  // angular momentum magnitude
-    double Pmag;  // linear momentum magnitude
+    double dE;   // relative energy drift
+    double dL;   // relative angular momentum drift
+    double dP;   // relative linear momentum drift
+    double Lmag; // angular momentum magnitude
+    double Pmag; // linear momentum magnitude
     double total_energy;
     double kinetic_energy;
     double potential_energy;
@@ -85,17 +83,18 @@ struct SimulationSnapshot
     ConservationSnapshot conservation;
 };
 
-struct SimulationResult{
-    std::vector<std::string>        body_names;
-    std::vector<double>             body_masses;
+struct SimulationResult
+{
+    std::vector<std::string> body_names;
+    std::vector<double> body_masses;
     std::vector<SimulationSnapshot> snapshots;
-    double dt        = 0.0;
-    int    stride    = 1;
-    bool   is_adaptive = false;
+    double dt = 0.0;
+    int stride = 1;
+    bool is_adaptive = false;
 };
 
-ConservationSnapshot computeSnapshot(const physics::Conservations& C,
-                                     double E0, double L0, double P0);
+ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0, double L0,
+                                     double P0);
 
 void exportCSV(const SimulationResult& result, const std::string& outputPath);
 
@@ -120,47 +119,33 @@ void leapfrogStep(std::vector<CelestialBody>& bodies, double dt);
  ***********************/
 struct RK45StepResult
 {
-    bool   accepted   = false;
-    double dt_used    = 0.0;
-    double dt_next    = 0.0;
+    bool accepted = false;
+    double dt_used = 0.0;
+    double dt_next = 0.0;
     double error_norm = 0.0;
 };
 
 // Compute scaled RMS error norm for step acceptance decision.
 // Returns < 1.0 if step is within tolerance, >= 1.0 if step should be rejected.
-double computeErrorNorm(
-    const std::vector<CelestialBody>& y_old,
-    const std::vector<CelestialBody>& y_new,
-    const std::vector<CelestialBody>& error,
-    double atol,
-    double rtol);
+double computeErrorNorm(const std::vector<CelestialBody>& y_old,
+                        const std::vector<CelestialBody>& y_new,
+                        const std::vector<CelestialBody>& error, double atol, double rtol);
 
 // Attempt one adaptive RK45 step.
 // If error_norm < 1: accepts step, advances bodies, returns dt_next > dt
 // If error_norm >= 1: rejects step, bodies unchanged, returns dt_next < dt
-RK45StepResult rk45Step(
-    std::vector<CelestialBody>& bodies,
-    double dt,
-    double atol = 1e-9,
-    double rtol = 1e-9);
+RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol = 1e-9,
+                        double rtol = 1e-9);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
-void runSimulation(std::vector<CelestialBody>& bodies,
-                   int steps,
-                   double dt,
-                   const std::string& outputPath,
-                   Integrator integrator = Integrator::RK4,
+void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
+                   const std::string& outputPath, Integrator integrator = Integrator::RK4,
                    int stride = 1);
 
 // RK45 overload — time-based instead of step-based
-void runSimulationAdaptive(std::vector<CelestialBody>& bodies,
-                           double duration_s,
-                           double dt_initial,
-                           const std::string& outputPath,
-                           double output_interval_s = 3600.0,
-                           double atol = 1e-9,
-                           double rtol = 1e-9,
-                           double dt_min = 1.0,
+void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
+                           const std::string& outputPath, double output_interval_s = 3600.0,
+                           double atol = 1e-9, double rtol = 1e-9, double dt_min = 1.0,
                            double dt_max = 86400.0);
 
 #endif // SIMULATION_H
