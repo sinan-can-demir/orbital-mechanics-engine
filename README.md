@@ -20,6 +20,21 @@ A high-performance **C++17 N-body gravitational simulator** with adaptive integr
 
 ---
 
+## Why this project?
+
+Orbital Mechanics Engine is designed for students, educators, and researchers who want to simulate gravitational systems and experiment with different integration methods. Unlike black-box solvers, swapping integrators requires changing a single argument — making it easy to compare accuracy, performance, and stability across RK4, Leapfrog, and RK45 without rewriting any simulation code.
+
+## Who is this for?
+
+| If you want to... | Use this |
+|---|---|
+| Run a simulation and plot results in Python | `orbit.simulate()` + Jupyter notebooks in `examples/` |
+| Compare integrator accuracy side by side | `orbit.Integrator.RK4` / `Leapfrog` / `RK45` — one argument |
+| Simulate with real planetary positions from NASA | `make build-solar-system` then `orbit.simulate()` |
+| Watch the simulation in real time | `make build` + `make view` (OpenGL viewer) |
+| Run from the command line without Python | `./build/bin/orbit-sim run --system systems/solar_system.json` |
+| Validate a custom system file | `./build/bin/orbit-sim validate --system your_system.json` |
+
 ## Quick start
 
 ### Python API
@@ -47,7 +62,7 @@ print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-10
 ### CLI
 
 ```bash
-./build/orbit-sim run \
+./build/bin/orbit-sim run \
     --system systems/solar_system.json \
     --integrator rk4 \
     --steps 8760 --dt 3600 \
@@ -78,7 +93,7 @@ pybind11 is downloaded automatically at configure time — no manual install nee
 ```bash
 make              # build everything (simulator + viewer + Python bindings)
 make BUILD_VIEWER=0 build   # headless build (CI / no OpenGL)
-make help         # list all available targets
+make help         # list all available targets with descriptions
 ```
 
 ### With CMake directly
@@ -110,8 +125,11 @@ After `pip install -e .`, the `orbit` module is available system-wide.
 ```python
 import orbit
 
-# Run a simulation
-result = orbit.simulate(path, steps, dt)
+# Fixed-step simulation (RK4, Leapfrog, or RK45)
+result = orbit.simulate(path, steps, dt, integrator=orbit.Integrator.RK4)
+
+# Adaptive RK45 simulation
+result = orbit.simulate_adaptive(path, duration_s, dt_initial)
 
 # Access results
 result.body_names          # list of body names
@@ -132,11 +150,20 @@ Jupyter notebooks are in `examples/`. Execute all cells with:
 ```bash
 jupyter nbconvert --to notebook --execute examples/01_solar_system.ipynb \
     --output 01_solar_system.ipynb --output-dir examples/
+
+# or run all notebooks at once
+for nb in examples/*.ipynb; do
+    jupyter nbconvert --to notebook --execute "$nb" \
+        --output "$(basename $nb)" --output-dir examples/
+done
 ```
 
 | Notebook | Description |
 |----------|-------------|
 | [01_solar_system.ipynb](examples/01_solar_system.ipynb) | Full solar system — orbital trajectories and energy conservation |
+| [02_earth_moon.ipynb](examples/02_earth_moon.ipynb) | Earth-Moon system with real NASA HORIZONS data — lunar orbit and perigee/apogee |
+| [03_integrator_comparison.ipynb](examples/03_integrator_comparison.ipynb) | RK4 vs Leapfrog vs RK45 — energy drift side-by-side |
+| [04_rk45_adaptive.ipynb](examples/04_rk45_adaptive.ipynb) | RK45 adaptive timestep history — how the integrator responds to orbital dynamics |
 
 ---
 
@@ -157,6 +184,30 @@ docs/             architecture, validation, and roadmap
 
 ---
 
+## OpenGL Viewer
+
+The engine includes a real-time 3D orbital viewer built with OpenGL. After running a simulation, launch it with:
+
+```bash
+make view          # view default simulation output
+make view-last     # view most recent simulation output
+```
+
+The viewer renders all bodies with mass-proportional sizes and hash-based colors. Camera controls:
+
+| Key | Action |
+|-----|--------|
+| Mouse drag | Rotate camera |
+| Scroll | Zoom in/out |
+| `1`–`9` | Focus on body by index |
+| `Space` | Pause / resume |
+| `+` / `-` | Speed up / slow down |
+| `R` | Reset to frame 0 |
+
+> The viewer requires OpenGL 3.3. Build without it on headless systems with `make BUILD_VIEWER=0 build`.
+
+---
+
 ## HORIZONS system builder
 
 Fetch real initial conditions from NASA JPL HORIZONS and build a system file:
@@ -169,9 +220,31 @@ make pipeline-earth-moon    # fetch → simulate → open viewer in one step
 
 ---
 
+## Contributing
+
+Contributions are welcome — new integrators, system files, notebooks, bug fixes, or documentation improvements. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setup, coding style, and physics accuracy requirements.
+
+For planned and potential future directions, see [docs/FUTURE.md](docs/FUTURE.md).
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+## Physics references
+
+- Vallado, D.A. *Fundamentals of Astrodynamics and Applications*, 4th ed.
+- Dormand, J.R. & Prince, P.J. (1980). *A family of embedded Runge-Kutta formulae*. Journal of Computational and Applied Mathematics.
+- Hairer, E., Nørsett, S.P. & Wanner, G. *Solving Ordinary Differential Equations I*, 2nd ed.
+- Murray, C.D. & Dermott, S.F. *Solar System Dynamics*. Cambridge University Press.
+- NASA JPL HORIZONS system: https://ssd.jpl.nasa.gov/horizons/
+
+## AI assistance
+
+This project was developed with AI assistance (Claude, Anthropic) for implementation details, debugging, and architecture discussions. All physics decisions, architectural choices, scientific validation, and the paper's Statement of Need are the author's own work.
 
 ---
 
