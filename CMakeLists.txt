@@ -216,7 +216,11 @@ add_test(NAME cli_smoke
 # ------------------------------------------------------------
 pybind11_add_module(orbit orbit_py/bindings.cpp)
 
+install(TARGETS orbit COMPONENT python DESTINATION .)
+
 target_link_libraries(orbit PRIVATE orbit_core)
+
+set_target_properties(orbit_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(orbit PRIVATE
     ${PROJECT_SOURCE_DIR}/include

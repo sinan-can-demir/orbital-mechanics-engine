@@ -98,6 +98,10 @@ ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0,
 
 void exportCSV(const SimulationResult& result, const std::string& outputPath);
 
+// Pure physics — no file I/O. Used by Python bindings and internally by runSimulation().
+SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
+                                   Integrator integrator = Integrator::RK4, int stride = 1);
+
 // ── Fixed-step integrators ────────────────────────────────────────────────────
 void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt);
