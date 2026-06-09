@@ -113,6 +113,7 @@ pip install -e . --no-build-isolation
 ### Run the test suite
 
 ```bash
+cmake --build build --parallel   # ensure all targets including tests are built
 cd build && ctest --output-on-failure
 ```
 

@@ -196,16 +196,16 @@ plot-3d-earth-moon:
 # ========================================
 
 python-install:
-	@echo "$(BLUE)Installing Python bindings...$(NC)"
+	@echo -e "$(BLUE)Installing Python bindings...$(NC)"
 	pip install -e . --no-build-isolation -q
-	@echo "$(GREEN)Python bindings installed.$(NC)"
+	@echo -e "$(GREEN)Python bindings installed.$(NC)"
 
 python-test:
-	@echo "$(BLUE)Running Python API tests...$(NC)"
+	@echo -e "$(BLUE)Running Python API tests...$(NC)"
 	pytest tests/test_python_api.py -v
 
 python-check: python-install python-test
-	@echo "$(GREEN)Python bindings check complete.$(NC)"
+	@echo -e "$(GREEN)Python bindings check complete.$(NC)"
 
 # ========================================
 # FORMATTING TARGETS
