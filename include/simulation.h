@@ -102,6 +102,12 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath);
 SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
                                    Integrator integrator = Integrator::RK4, int stride = 1);
 
+SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies,
+                                           double duration_s, double dt_initial,
+                                           double output_interval_s = 3600.0,
+                                           double atol = 1e-9, double rtol = 1e-9,
+                                           double dt_min = 1.0, double dt_max = 86400.0);
+
 // ── Fixed-step integrators ────────────────────────────────────────────────────
 void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt);
