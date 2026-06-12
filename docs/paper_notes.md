@@ -4,6 +4,50 @@ Pre-writing notes for paper.md (JOSS submission). Not a draft — just findings 
 
 ---
 
+## Submission roadmap
+
+| Phase | Status | Description |
+|---|---|---|
+| Python API (pybind11) | Done | `orbit.simulate()`, `simulate_adaptive()`, NumPy output |
+| Tests + CI | Done | 7 C++ tests, 4 Python tests, GitHub Actions |
+| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 6 notebooks |
+| REBOUND comparison | Done | Notebooks 05 & 06, benchmark script |
+| **SPICE validation** | **Next** | Compare simulated vs real trajectories using NASA kernels |
+| paper.md + paper.bib | Pending | JOSS submission — blocked on SPICE results |
+
+---
+
+## SPICE validation plan
+
+**What:** Use NASA SPICE kernels (`de440.bsp`) to get ground-truth planetary positions, then compare against our simulated trajectories. Reports position error in km over time for each body.
+
+**Why this strengthens the paper:** Energy drift is an internal consistency check — it tells you the integrator is self-consistent, not that it matches reality. SPICE comparison gives an external ground truth: *"our simulated Jupiter is within X km of the real trajectory after 1 year."* That's a publishable accuracy claim.
+
+**Implementation steps:**
+1. `pip install spiceypy` — Python wrapper around NASA CSPICE
+2. Download kernels: `de440.bsp` (planetary positions), `naif0012.tls` (leap seconds), `pck00011.tpc` (physical constants)
+3. Write `python/spice_validate.py` — takes a `SimulationResult`, returns position errors per body per snapshot
+4. Notebook `examples/07_spice_validation.ipynb` — run simulation, query SPICE, plot error over time
+5. Record results in this file for paper.md
+
+**SPICE body codes used:**
+- 10: Sun, 199: Mercury, 299: Venus, 399: Earth, 301: Moon
+- 499: Mars, 599: Jupiter, 699: Saturn, 799: Uranus, 899: Neptune
+
+**Kernels to download:**
+```
+https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp
+https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls
+https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
+```
+
+**Expected result format (to fill in after running):**
+- Body, integrator, duration, max position error (km), mean position error (km)
+
+---
+
+---
+
 ## Benchmark results
 
 ### Earth-Moon system (3 bodies), 1-year integration

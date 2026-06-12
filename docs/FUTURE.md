@@ -10,8 +10,6 @@ The current CSV output format is human-readable but slow for large simulations. 
 
 **Binary output format** — a compact `.orb` file storing float64 positions with a JSON sidecar for metadata. Would enable stride=1 full-resolution trajectories without file size penalties.
 
-**NASA SPICE/SPK support** — SPICE is NASA's standard format for ephemeris data. Supporting it directly would allow importing trajectories from any NASA mission and comparing simulation output against real spacecraft data.
-
 ---
 
 ## Native desktop application
