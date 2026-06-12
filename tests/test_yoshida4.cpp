@@ -10,27 +10,28 @@
 #include <vector>
 
 static double maxEnergyDrift(std::vector<CelestialBody> bodies, int steps, double dt,
-                              void (*stepFn)(std::vector<CelestialBody>&, double))
+                             void (*stepFn)(std::vector<CelestialBody>&, double))
 {
-    auto C0   = physics::compute(bodies);
+    auto C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
     double maxErr = 0.0;
 
-    updateAccelerations(bodies);  // required before first symplectic step
+    updateAccelerations(bodies); // required before first symplectic step
     for (int i = 0; i < steps; ++i)
     {
         stepFn(bodies, dt);
         auto C = physics::compute(bodies);
         double err = std::abs((C.total_energy - E0) / E0);
-        if (err > maxErr) maxErr = err;
+        if (err > maxErr)
+            maxErr = err;
     }
     return maxErr;
 }
 
 int main()
 {
-    const double DT    = 3600.0;   // 1-hour step
-    const int    STEPS = 8760;     // 1 year
+    const double DT = 3600.0; // 1-hour step
+    const int STEPS = 8760;   // 1 year
 
     auto bodies = loadSystemFromJSON("systems/earth_moon.json");
 

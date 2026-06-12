@@ -215,26 +215,33 @@ void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
 {
     // Yoshida (1990) coefficients: compose Leapfrog(w1) ∘ Leapfrog(w0) ∘ Leapfrog(w1)
     // w0 is negative — the middle sub-step reverses direction to cancel error terms.
-    constexpr double CR2 = 1.2599210498948732;  // ∛2
-    constexpr double w1  = 1.0 / (2.0 - CR2);  // ≈ +1.3512
-    constexpr double w0  = 1.0 - 2.0 * w1;     // ≈ −1.7024
-    constexpr double c1  = w1 / 2.0;            // ≈ +0.6756  (merged outer half-kicks)
-    constexpr double c2  = (w0 + w1) / 2.0;    // ≈ −0.1756  (merged inner half-kicks)
+    constexpr double CR2 = 1.2599210498948732; // ∛2
+    constexpr double w1 = 1.0 / (2.0 - CR2);   // ≈ +1.3512
+    constexpr double w0 = 1.0 - 2.0 * w1;      // ≈ −1.7024
+    constexpr double c1 = w1 / 2.0;            // ≈ +0.6756  (merged outer half-kicks)
+    constexpr double c2 = (w0 + w1) / 2.0;     // ≈ −0.1756  (merged inner half-kicks)
 
     // Palindromic DKD sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
-    for (auto& b : bodies) b.velocity += b.acceleration * (c1 * dt);
-    for (auto& b : bodies) b.position += b.velocity     * (w1 * dt);
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c1 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w1 * dt);
     updateAccelerations(bodies);
 
-    for (auto& b : bodies) b.velocity += b.acceleration * (c2 * dt);
-    for (auto& b : bodies) b.position += b.velocity     * (w0 * dt);
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c2 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w0 * dt);
     updateAccelerations(bodies);
 
-    for (auto& b : bodies) b.velocity += b.acceleration * (c2 * dt);
-    for (auto& b : bodies) b.position += b.velocity     * (w1 * dt);
-    updateAccelerations(bodies);  // leave accelerations current for next step
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c2 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w1 * dt);
+    updateAccelerations(bodies); // leave accelerations current for next step
 
-    for (auto& b : bodies) b.velocity += b.acceleration * (c1 * dt);
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c1 * dt);
 }
 
 /********************

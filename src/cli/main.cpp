@@ -305,9 +305,10 @@ int main(int argc, char** argv)
                       << " - Stride:     " << stride << "\n"
                       << " - Output:     " << outPath << "\n"
                       << " - Integrator: "
-                      << (integrator == Integrator::Leapfrog ? "Leapfrog"
+                      << (integrator == Integrator::Leapfrog   ? "Leapfrog"
                           : integrator == Integrator::Yoshida4 ? "Yoshida4"
-                          : "RK4") << "\n";
+                                                               : "RK4")
+                      << "\n";
 
             runSimulation(bodies, steps, dt, outPath, integrator, stride);
         }
