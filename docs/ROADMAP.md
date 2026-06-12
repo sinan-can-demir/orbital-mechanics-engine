@@ -3,7 +3,8 @@
 **Author**: Sinan Can Demir  
 **Last Updated**: June 2026  
 **GitHub**: https://github.com/sinan-can-demir/orbital-mechanics-engine  
-**Target**: JOSS submission at v2.0
+**Target**: JOSS submission at v2.0 — end of summer 2026 (September)  
+**Scope**: Scale B — educational tool with Yoshida + Hermite integrators, SPICE validation, full paper
 
 ---
 
@@ -52,9 +53,21 @@ All core phases are complete. The project is in pre-submission preparation.
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ⏳ In progress |
 | **Yoshida 4th-order integrator** | ❌ Not started |
+| **Hermite integrator** | ❌ Not started |
 | **`paper.md` + `paper.bib`** | ❌ Not started |
 | Software version tagged on GitHub | ❌ Pending |
 | DOI via Zenodo | ❌ Pending (after tag) |
+
+---
+
+## Timeline
+
+```
+June 2026      SPICE validation (2 weeks)
+July 2026      Yoshida 4th (1 week) + Hermite integrator (2 weeks)
+August 2026    Update benchmarks + notebooks (1 week) + paper.md (2 weeks)
+September 2026 Cleanup, tag v2.0.0, Zenodo DOI, submit to JOSS
+```
 
 ---
 
@@ -122,7 +135,7 @@ Write the JOSS paper after SPICE and Yoshida are done. See `docs/paper_notes.md`
 
 ## Post-Submission (v2.1+)
 
-- **Hermite integrator** — 4th-order, used in stellar dynamics (Aarseth NBODY codes). Most distinctive addition; no comparable educational tool has it. Medium complexity.
+- **Wisdom-Holman symplectic map** — Keplerian decomposition for million-year integrations. See [keplerian_physics.md](keplerian_physics.md) for full background.
 - See [FUTURE.md](FUTURE.md) for all other directions: binary I/O, native app, systems database, collision/merge/rogue-body detection.
 
 ---
