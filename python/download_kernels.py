@@ -13,9 +13,10 @@ import urllib.request
 KERNEL_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'spice')
 
 KERNELS = [
-    ('naif0012.tls', 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls'),
-    ('pck00011.tpc', 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc'),
-    ('de440.bsp',    'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp'),
+    ('naif0012.tls',  'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls'),
+    ('pck00011.tpc',  'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc'),
+    ('gm_de431.tpc',  'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de431.tpc'),
+    ('de440.bsp',     'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp'),
 ]
 
 def download():
