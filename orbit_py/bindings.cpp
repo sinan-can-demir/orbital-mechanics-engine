@@ -55,7 +55,7 @@ py::array_t<double> energies_numpy(const SimulationResult& result)
 PYBIND11_MODULE(orbit, m)
 {
     m.doc() = "Orbital Mechanics Engine — Python bindings";
-    m.attr("__version__") = "2.0.0-dev";
+    m.attr("__version__") = "2.0.0";
 
     py::enum_<Integrator>(m, "Integrator")
         .value("RK4", Integrator::RK4)

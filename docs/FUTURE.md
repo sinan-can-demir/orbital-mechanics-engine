@@ -10,8 +10,6 @@ The current CSV output format is human-readable but slow for large simulations. 
 
 **Binary output format** — a compact `.orb` file storing float64 positions with a JSON sidecar for metadata. Would enable stride=1 full-resolution trajectories without file size penalties.
 
-**NASA SPICE/SPK support** — SPICE is NASA's standard format for ephemeris data. Supporting it directly would allow importing trajectories from any NASA mission and comparing simulation output against real spacecraft data.
-
 ---
 
 ## Native desktop application
@@ -57,8 +55,20 @@ This is a well-defined physical condition: `E_total = KE + PE > 0`.
 
 ---
 
+## Higher-order symplectic integrators
+
+Leapfrog (Störmer-Verlet) is 2nd-order symplectic — it conserves a modified Hamiltonian exactly, so energy drift stays bounded rather than accumulating. This makes it far better than RK4 for long-term integrations (millions of years).
+
+**Yoshida 4th-order** is the natural next step: it composes three Leapfrog sub-steps with specific coefficients to achieve 4th-order accuracy while remaining symplectic. For million-year solar system runs, it gives significantly better phase-space accuracy than Leapfrog at ~3× the cost per step — but much larger timesteps become viable, so net cost is lower.
+
+Higher-order variants (6th, 8th order Yoshida, PEFRL) exist but offer diminishing returns for most use cases. Yoshida 4th is the practical sweet spot.
+
+Implementation: add `Integrator::Yoshida4` to the enum in `include/simulation.h`, implement in `src/core/simulation.cpp` alongside Leapfrog, and expose via `py::enum_<Integrator>` in `orbit_py/bindings.cpp`. The coefficients are published and well-known.
+
+---
+
 ## Notes
 
-These ideas vary in scope. Rogue body detection and collision detection are small additions to the existing simulation loop. Binary I/O and body merging are medium-sized projects. The native app and systems database are larger efforts.
+These ideas vary in scope. Rogue body detection and collision detection are small additions to the existing simulation loop. Binary I/O, body merging, and Yoshida integration are medium-sized projects. The native app and systems database are larger efforts.
 
 Contributions toward any of these are welcome — see [CONTRIBUTING.md](../CONTRIBUTING.md).
