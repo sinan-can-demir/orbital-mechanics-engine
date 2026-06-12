@@ -52,7 +52,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Clean install verified on separate machine | ✅ Done |
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ✅ Done |
-| **SPICE-based initial conditions** | ❌ Not started |
+| **SPICE-based initial conditions** | ✅ Done |
 | **Post-Newtonian GR correction** | ❌ Not started |
 | **Yoshida 4th-order integrator** | ❌ Not started |
 | **Hermite integrator** | ❌ Not started |
@@ -75,7 +75,7 @@ September 2026 Cleanup, tag v2.0.0, Zenodo DOI, submit to JOSS
 
 ## What's Left
 
-### Step 1 — SPICE Validation ⏳ current
+### Step 1 — SPICE Validation ✅ Done
 
 Compare simulated trajectories against NASA SPICE kernels (ground truth) to produce a quantitative position accuracy claim for the paper.
 
@@ -86,7 +86,7 @@ Compare simulated trajectories against NASA SPICE kernels (ground truth) to prod
 - [x] Write `python/spice_validate.py` — ECLIPJ2000 frame, per-body error
 - [x] Write `python/download_kernels.py` — one-command kernel download
 - [x] Notebook `examples/07_spice_validation.ipynb` — executed, all plots working
-- [ ] Record final results in `docs/paper_notes.md` (after GR + SPICE ICs)
+- [x] Record final results in `docs/paper_notes.md`
 
 **Kernels:**
 ```
@@ -97,21 +97,14 @@ https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
 
 ---
 
-### Step 1b — SPICE-Based Initial Conditions
+### Step 1b — SPICE-Based Initial Conditions ✅ Done
 
-Replace HORIZONS-derived ICs with SPICE DE440 positions and velocities. Eliminates the ~107,000 km IC mismatch at t=0, making the SPICE validation a clean test of integration accuracy only.
+- [x] Write `python/spice_ic.py` — queries SPICE for body positions/velocities at a given epoch, writes `systems/solar_system_spice.json`
+- [x] Fix snapshot timestamp bug: `runSimulationCore` was labeling snapshots `i*dt` but saving the state at `(i+1)*dt`. Fixed to `(i+1)*dt`.
+- [x] Verify: re-run SPICE validation with SPICE-derived ICs — t=1h error = **0 km** (from 107,000 km with HORIZONS ICs)
+- [x] Document in `docs/paper_notes.md` with corrected numbers
 
-**Why:** HORIZONS and DE440 are different data products from the same underlying model — they don't agree exactly. Using SPICE ICs as both the starting point and the ground truth gives a clean, honest validation.
-
-- [ ] Write `python/spice_ic.py` — queries SPICE for body positions/velocities at a given epoch, writes a JSON system file in our format
-- [ ] Verify: re-run SPICE validation with SPICE-derived ICs — t=0 error should be near 0
-- [ ] Document in `docs/paper_notes.md`
-
-**Key function:**
-```python
-def build_system_from_spice(bodies, epoch, output_path):
-    # queries spkgeo for each body, writes JSON compatible with orbit.simulate()
-```
+**Result:** With DE440 ICs, Earth 1-year error = **88,126 km (0.059%)**, dominated by missing GR. All 4 integrators give identical error — physics-dominated, not numerical.
 
 ---
 
