@@ -203,6 +203,14 @@ add_test(NAME leapfrog
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(test_yoshida4 tests/test_yoshida4.cpp)
+target_link_libraries(test_yoshida4 PRIVATE orbit_core)
+target_include_directories(test_yoshida4 PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME yoshida4
+    COMMAND test_yoshida4
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(test_cli tests/test_cli.cpp)
 target_link_libraries(test_cli PRIVATE orbit_core)
 target_include_directories(test_cli PRIVATE ${PROJECT_SOURCE_DIR}/include)

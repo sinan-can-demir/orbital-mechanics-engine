@@ -62,6 +62,7 @@ PYBIND11_MODULE(orbit, m)
         .value("Leapfrog", Integrator::Leapfrog)
         .value("RK45", Integrator::RK45)
         .value("Euler", Integrator::euler)
+        .value("Yoshida4", Integrator::Yoshida4)
         .export_values();
 
     py::class_<SimulationSnapshot>(m, "SimulationSnapshot")

@@ -26,7 +26,8 @@ enum class Integrator
     RK4,
     Leapfrog,
     RK45,
-    euler
+    euler,
+    Yoshida4,
 };
 
 // ── Internal derivative type ──────────────────────────────────────────────────
@@ -111,6 +112,8 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
 void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt);
 void leapfrogStep(std::vector<CelestialBody>& bodies, double dt);
+void yoshida4Step(std::vector<CelestialBody>& bodies, double dt);
+void updateAccelerations(std::vector<CelestialBody>& bodies);
 
 // ── RK45 adaptive integrator ──────────────────────────────────────────────────
 
