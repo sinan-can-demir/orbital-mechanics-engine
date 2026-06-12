@@ -19,6 +19,11 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 
 # ============================================================
+# SPICE kernels (large binary files, download via python/download_kernels.py)
+# ============================================================
+data/spice/
+
+# ============================================================
 # Simulation output
 # ============================================================
 results/
