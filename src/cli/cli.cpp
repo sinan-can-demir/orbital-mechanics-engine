@@ -190,7 +190,7 @@ void printCommandHelp(const std::string& cmd)
                   << "  --steps N                  Number of integration steps\n"
                   << "  --dt T                     Timestep in seconds\n"
                   << "  --stride N                 Write one CSV row every N steps (default: 1)\n"
-                  << "  --integrator rk4|leapfrog  Integration method (default: rk4)\n"
+                  << "  --integrator rk4|leapfrog|yoshida4  Integration method (default: rk4)\n"
                   << "  --normalize                Shift system so COM=0 and net momentum=0\n\n"
                   << "Example:\n"
                   << "  orbit-sim run --system systems/earth_moon.json"

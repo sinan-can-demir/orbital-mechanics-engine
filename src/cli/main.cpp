@@ -285,13 +285,13 @@ int main(int argc, char** argv)
             // Resolve integrator
             Integrator integrator = Integrator::RK4;
             if (opt.integrator == "leapfrog")
-            {
                 integrator = Integrator::Leapfrog;
-            }
+            else if (opt.integrator == "yoshida4")
+                integrator = Integrator::Yoshida4;
             else if (!opt.integrator.empty() && opt.integrator != "rk4")
             {
                 std::cerr << "❌ Unknown integrator: " << opt.integrator
-                          << ". Valid options: rk4, leapfrog\n";
+                          << ". Valid options: rk4, leapfrog, yoshida4\n";
                 return 1;
             }
 
@@ -305,7 +305,10 @@ int main(int argc, char** argv)
                       << " - Stride:     " << stride << "\n"
                       << " - Output:     " << outPath << "\n"
                       << " - Integrator: "
-                      << (integrator == Integrator::Leapfrog ? "Leapfrog" : "RK4") << "\n";
+                      << (integrator == Integrator::Leapfrog   ? "Leapfrog"
+                          : integrator == Integrator::Yoshida4 ? "Yoshida4"
+                                                               : "RK4")
+                      << "\n";
 
             runSimulation(bodies, steps, dt, outPath, integrator, stride);
         }

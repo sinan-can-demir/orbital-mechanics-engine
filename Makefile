@@ -39,6 +39,7 @@ NC               := \033[0m
 .PHONY: build-earth-moon build-solar-system pipeline-earth-moon
 .PHONY: format format-check
 .PHONY: python-install python-test python-check
+.PHONY: spice-kernels spice-build-ics spice-setup
 
 # Default target
 all: build
@@ -208,6 +209,23 @@ python-check: python-install python-test
 	@echo -e "$(GREEN)Python bindings check complete.$(NC)"
 
 # ========================================
+# SPICE TARGETS
+# ========================================
+
+spice-kernels:
+	@echo -e "$(BLUE)Downloading SPICE kernels (~115 MB)...$(NC)"
+	@$(PYTHON) python/download_kernels.py
+	@echo -e "$(GREEN)Kernels ready in data/spice/$(NC)"
+
+spice-build-ics:
+	@echo -e "$(BLUE)Building SPICE-derived initial conditions...$(NC)"
+	@$(PYTHON) python/spice_ic.py --epoch 2025-01-01T00:00:00 --output systems/solar_system_spice.json
+	@echo -e "$(GREEN)Written: systems/solar_system_spice.json$(NC)"
+
+spice-setup: spice-kernels spice-build-ics
+	@echo -e "$(GREEN)SPICE setup complete. Run notebook 07 for validation.$(NC)"
+
+# ========================================
 # FORMATTING TARGETS
 # ========================================
 
@@ -271,6 +289,11 @@ help:
 	@echo "    make python-install     - pip install -e . (build and install Python module)"
 	@echo "    make python-test        - Run pytest tests/test_python_api.py"
 	@echo "    make python-check       - Install + test in one step"
+	@echo ""
+	@echo "  SPICE Targets:"
+	@echo "    make spice-kernels      - Download NASA SPICE kernels to data/spice/ (~115 MB)"
+	@echo "    make spice-build-ics    - Build systems/solar_system_spice.json from DE440"
+	@echo "    make spice-setup        - Download kernels + build ICs in one step"
 	@echo ""
 	@echo "    make format             - Auto-format all source files"
 	@echo "    make format-check       - Check formatting (CI style)"

@@ -203,6 +203,47 @@ void leapfrogStep(std::vector<CelestialBody>& bodies, double dt)
         b.velocity += b.acceleration * (dt * 0.5);
 }
 
+/**
+ * yoshida4Step
+ *
+ * @brief: 4th-order symplectic integrator via Yoshida (1990) triple-Leapfrog composition.
+ * @note: Requires accelerations pre-computed before first call (same as leapfrogStep).
+ *        3 force evaluations per step vs 1 for Leapfrog, but achieves O(dt^5) error
+ *        vs O(dt^3) — a much larger timestep can be used for equivalent accuracy.
+ */
+void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
+{
+    // Yoshida (1990) coefficients: compose Leapfrog(w1) ∘ Leapfrog(w0) ∘ Leapfrog(w1)
+    // w0 is negative — the middle sub-step reverses direction to cancel error terms.
+    constexpr double CR2 = 1.2599210498948732; // ∛2
+    constexpr double w1 = 1.0 / (2.0 - CR2);   // ≈ +1.3512
+    constexpr double w0 = 1.0 - 2.0 * w1;      // ≈ −1.7024
+    constexpr double c1 = w1 / 2.0;            // ≈ +0.6756  (merged outer half-kicks)
+    constexpr double c2 = (w0 + w1) / 2.0;     // ≈ −0.1756  (merged inner half-kicks)
+
+    // Palindromic DKD sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c1 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w1 * dt);
+    updateAccelerations(bodies);
+
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c2 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w0 * dt);
+    updateAccelerations(bodies);
+
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c2 * dt);
+    for (auto& b : bodies)
+        b.position += b.velocity * (w1 * dt);
+    updateAccelerations(bodies); // leave accelerations current for next step
+
+    for (auto& b : bodies)
+        b.velocity += b.acceleration * (c1 * dt);
+}
+
 /********************
  * detectSEM
  * @brief: Detects indices of Sun, Earth, and Moon in the bodies vector.
@@ -370,7 +411,7 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    if (integrator == Integrator::Leapfrog)
+    if (integrator == Integrator::Leapfrog || integrator == Integrator::Yoshida4)
         updateAccelerations(bodies);
 
     SimulationResult result;
@@ -388,6 +429,8 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
     {
         if (integrator == Integrator::Leapfrog)
             leapfrogStep(bodies, dt);
+        else if (integrator == Integrator::Yoshida4)
+            yoshida4Step(bodies, dt);
         else
             rk4Step(bodies, dt);
 
