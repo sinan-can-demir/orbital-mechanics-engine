@@ -401,7 +401,7 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         pos.reserve(bodies.size());
         for (const auto& b : bodies)
             pos.push_back(b.position);
-        result.snapshots.push_back({i, i * dt, dt, pos, snap});
+        result.snapshots.push_back({i, (i + 1) * dt, dt, pos, snap});
     }
 
     return result;
