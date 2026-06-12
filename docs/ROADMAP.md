@@ -51,6 +51,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Clean install verified on separate machine | ✅ Done |
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ⏳ In progress |
+| **Yoshida 4th-order integrator** | ❌ Not started |
 | **`paper.md` + `paper.bib`** | ❌ Not started |
 | Software version tagged on GitHub | ❌ Pending |
 | DOI via Zenodo | ❌ Pending (after tag) |
@@ -59,17 +60,17 @@ All core phases are complete. The project is in pre-submission preparation.
 
 ## What's Left
 
-### Phase 5a — SPICE Validation (current)
+### Step 1 — SPICE Validation ⏳ current
 
 Compare simulated trajectories against NASA SPICE kernels (ground truth) to produce a quantitative position accuracy claim for the paper.
 
-**Why:** Energy drift is an internal consistency check. SPICE comparison gives an external ground truth — *"our simulated Jupiter is within X km of the real trajectory after 1 year."* That's a publishable accuracy claim.
+**Why:** Energy drift is an internal consistency check. SPICE gives an external ground truth — *"our simulated Jupiter is within X km of the real trajectory after 1 year."* That's a publishable accuracy claim.
 
-**Steps:**
-1. Install `spiceypy`, download `de440.bsp`, `naif0012.tls`, `pck00011.tpc`
-2. Write `python/spice_validate.py` — takes a `SimulationResult`, returns position error per body
-3. Notebook `examples/07_spice_validation.ipynb` — run simulation, query SPICE, plot error
-4. Record results in `docs/paper_notes.md` for use in paper.md
+- [ ] `pip install spiceypy`
+- [ ] Download `de440.bsp`, `naif0012.tls`, `pck00011.tpc` from NAIF
+- [ ] Write `python/spice_validate.py` — queries SPICE position at each snapshot time, returns error per body
+- [ ] Notebook `examples/07_spice_validation.ipynb` — simulate, compare, plot position error over time
+- [ ] Record results in `docs/paper_notes.md`
 
 **Kernels:**
 ```
@@ -78,33 +79,51 @@ https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls
 https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
 ```
 
-### Phase 5b — paper.md
+---
 
-Write the JOSS paper after SPICE results are in hand. See `docs/paper_notes.md` for findings, draft Statement of Need, and benchmark tables.
+### Step 2 — Yoshida 4th-Order Symplectic Integrator
 
-**Structure:**
-- Summary (~200 words)
-- Statement of Need (~300 words) — *must be written by the author*
-- Mathematics and Numerical Methods
-- Validation (SPICE results + REBOUND comparison)
-- Example Usage
-- References (`paper.bib`)
+Add a 4th-order symplectic integrator for long-term integrations (million-year runs). Composes three Leapfrog sub-steps with published Yoshida coefficients. Directly strengthens the paper's integrator comparison story.
 
-**Target length:** ≤ 1000 words (JOSS limit).
-
-### Phase 5c — Release and Submission
-
-1. Bump version from `2.0.0-dev` → `2.0.0` in `bindings.cpp` and `pyproject.toml`
-2. Merge all open branches to `main`
-3. Tag `v2.0.0` on GitHub
-4. Register DOI via Zenodo
-5. Submit to JOSS
+- [ ] Add `Integrator::Yoshida4` to enum in `include/simulation.h`
+- [ ] Implement in `src/core/simulation.cpp` alongside Leapfrog (~30 lines)
+- [ ] Expose via `py::enum_<Integrator>` in `orbit_py/bindings.cpp`
+- [ ] Add CLI support (`--integrator yoshida4`)
+- [ ] Add conservation test
+- [ ] Update notebooks 03 and 05/06 to include Yoshida in comparisons
 
 ---
 
-## Future Directions
+### Step 3 — paper.md + paper.bib
 
-See [FUTURE.md](FUTURE.md) for longer-term ideas: Yoshida 4th-order symplectic integrator, binary I/O format, native desktop GUI, systems database, collision/merge/rogue-body detection.
+Write the JOSS paper after SPICE and Yoshida are done. See `docs/paper_notes.md` for benchmark tables, draft Statement of Need, and claims inventory.
+
+- [ ] Summary (~200 words)
+- [ ] Statement of Need (~300 words) — *must be written by the author*
+- [ ] Mathematics and Numerical Methods
+- [ ] Validation (SPICE results + REBOUND comparison)
+- [ ] Example Usage
+- [ ] `paper.bib` with all references
+- [ ] Verify renders with `pandoc`
+
+**Target length:** ≤ 1000 words (JOSS limit).
+
+---
+
+### Step 4 — Release and Submit
+
+- [ ] Bump version `2.0.0-dev` → `2.0.0` in `bindings.cpp` and `pyproject.toml`
+- [ ] Merge all open branches to `main`
+- [ ] Tag `v2.0.0` on GitHub
+- [ ] Register DOI via Zenodo
+- [ ] Submit to JOSS
+
+---
+
+## Post-Submission (v2.1+)
+
+- **Hermite integrator** — 4th-order, used in stellar dynamics (Aarseth NBODY codes). Most distinctive addition; no comparable educational tool has it. Medium complexity.
+- See [FUTURE.md](FUTURE.md) for all other directions: binary I/O, native app, systems database, collision/merge/rogue-body detection.
 
 ---
 
