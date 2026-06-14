@@ -230,9 +230,9 @@ int main(int argc, char** argv)
             try
             {
                 auto bodies = loadSystemFromJSON(opt.output);
-                int steps = (opt.steps > 0 ? opt.steps : 8766);
-                double dt = (opt.dt > 0 ? opt.dt : 3600.0);
-                int stride = (opt.stride > 0 ? opt.stride : 1);
+                int steps  = (opt.steps  == -1  ? 8766   : opt.steps);
+                double dt  = (opt.dt     == -1.0 ? 3600.0 : opt.dt);
+                int stride = (opt.stride == -1   ? 1      : opt.stride);
                 const std::string runOut = opt.output + ".csv";
 
                 std::cout << "Running simulation after build:\n"
@@ -276,8 +276,27 @@ int main(int argc, char** argv)
             }
 
             // Determine simulation parameters
-            int steps = (opt.steps > 0 ? opt.steps : 8766);
-            double dt = (opt.dt > 0 ? opt.dt : 3600.0);
+            int steps;
+            if (opt.steps == -1)
+                steps = 8766;
+            else if (opt.steps <= 0)
+            {
+                std::cerr << "❌ --steps must be a positive integer\n";
+                return 1;
+            }
+            else
+                steps = opt.steps;
+
+            double dt;
+            if (opt.dt == -1.0)
+                dt = 3600.0;
+            else if (opt.dt <= 0.0)
+            {
+                std::cerr << "❌ --dt must be a positive number\n";
+                return 1;
+            }
+            else
+                dt = opt.dt;
 
             // Default output path
             std::string outPath = opt.output.empty() ? "build/orbit_three_body.csv" : opt.output;
@@ -296,7 +315,7 @@ int main(int argc, char** argv)
             }
 
             // In the run block, alongside steps and dt:
-            int stride = (opt.stride > 0 ? opt.stride : 1);
+            int stride = (opt.stride == -1 ? 1 : opt.stride);
 
             std::cout << "Running simulation:\n"
                       << " - System:     " << opt.systemFile << "\n"

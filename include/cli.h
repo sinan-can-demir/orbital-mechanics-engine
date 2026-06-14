@@ -31,9 +31,9 @@ struct CLIOptions
     std::string systemFile;
     std::string integrator;
 
-    int steps = 0;
-    int stride = 1;
-    double dt = 0;
+    int steps = -1;
+    int stride = -1;
+    double dt = -1.0;
 
     // fetch
     std::string fetchBody;
