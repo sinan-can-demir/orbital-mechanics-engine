@@ -424,15 +424,16 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         result.body_names.push_back(b.name);
         result.body_masses.push_back(b.mass);
     }
-
+    
+    void (*stepFn)(std::vector<CelestialBody>&, double) = nullptr;
+    if      (integrator == Integrator::Leapfrog) stepFn = leapfrogStep;
+    else if (integrator == Integrator::Yoshida4) stepFn = yoshida4Step;
+    else if (integrator == Integrator::RK4)      stepFn = rk4Step;
+    else throw std::invalid_argument("Unknown integrator");
+    
     for (int i = 0; i < steps; ++i)
     {
-        if (integrator == Integrator::Leapfrog)
-            leapfrogStep(bodies, dt);
-        else if (integrator == Integrator::Yoshida4)
-            yoshida4Step(bodies, dt);
-        else
-            rk4Step(bodies, dt);
+        stepFn(bodies, dt);
 
         if (i % stride != 0)
             continue;
