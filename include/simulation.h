@@ -13,7 +13,7 @@
 #include "conservations.h"
 #include "eclipse.h"
 #include "rk45_coefficients.h"
-#include "utils.h"
+#include "constants.h"
 #include "vec3.h"
 #include <cmath>
 #include <fstream>

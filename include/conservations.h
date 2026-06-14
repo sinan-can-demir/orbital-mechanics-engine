@@ -9,7 +9,7 @@
 #define CONSERVATIONS_H
 
 #include "body.h"
-#include "utils.h"
+#include "constants.h"
 #include <array>
 #include <cmath>
 #include <vector>

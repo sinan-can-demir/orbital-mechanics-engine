@@ -12,7 +12,7 @@
  *****************/
 
 #include "eclipse.h"
-#include "utils.h" // for constants::R_SUN etc.
+#include "constants.h" // for constants::R_SUN etc.
 
 /****************
  * computeSolarEclipse
