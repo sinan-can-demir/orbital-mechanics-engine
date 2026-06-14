@@ -65,11 +65,28 @@ PYBIND11_MODULE(orbit, m)
         .value("Yoshida4", Integrator::Yoshida4)
         .export_values();
 
+    py::class_<ConservationSnapshot>(m, "ConservationSnapshot")
+        .def_readonly("dE", &ConservationSnapshot::dE)
+        .def_readonly("dL", &ConservationSnapshot::dL)
+        .def_readonly("dP", &ConservationSnapshot::dP)
+        .def_readonly("total_energy", &ConservationSnapshot::total_energy)
+        .def_readonly("kinetic_energy", &ConservationSnapshot::kinetic_energy)
+        .def_readonly("potential_energy", &ConservationSnapshot::potential_energy)
+        .def_readonly("Lmag", &ConservationSnapshot::Lmag)
+        .def_readonly("Pmag", &ConservationSnapshot::Pmag)
+        .def_readonly("Lx", &ConservationSnapshot::Lx)
+        .def_readonly("Ly", &ConservationSnapshot::Ly)
+        .def_readonly("Lz", &ConservationSnapshot::Lz)
+        .def_readonly("Px", &ConservationSnapshot::Px)
+        .def_readonly("Py", &ConservationSnapshot::Py)
+        .def_readonly("Pz", &ConservationSnapshot::Pz);
+
     py::class_<SimulationSnapshot>(m, "SimulationSnapshot")
         .def_readonly("step", &SimulationSnapshot::step)
         .def_readonly("time_s", &SimulationSnapshot::time_s)
         .def_readonly("dt_used", &SimulationSnapshot::dt_used)
-        .def_readonly("positions", &SimulationSnapshot::positions);
+        .def_readonly("positions", &SimulationSnapshot::positions)
+        .def_readonly("conservation", &SimulationSnapshot::conservation);
 
     py::class_<SimulationResult>(m, "SimulationResult")
         .def_readonly("body_names", &SimulationResult::body_names)

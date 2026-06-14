@@ -44,61 +44,6 @@ static inline std::array<double, 3> angular_term(const CelestialBody& b)
     return {L.x(), L.y(), L.z()};
 }
 
-/*****************
- * Computes conservation diagnostics for the 3-body system
- * @param: sun   - Sun body
- * @param: earth - Earth body
- * @param: moon  - Moon body
- * @return: Conservations struct with energy and momentum values
- * @exception: none
- * @note: uses helper functions distance() and angular_term()
- *****************/
-Conservations compute(const CelestialBody& sun, const CelestialBody& earth,
-                      const CelestialBody& moon)
-{
-
-    Conservations C;
-
-    // ---- Kinetic Energy ---- //
-    auto v2 = [](const CelestialBody& b) { return b.velocity.length_squared(); };
-
-    C.kinetic_energy =
-        0.5 * sun.mass * v2(sun) + 0.5 * earth.mass * v2(earth) + 0.5 * moon.mass * v2(moon);
-
-    // ---- Potential Energy ---- //
-    double r_se = distance(sun, earth);
-    double r_sm = distance(sun, moon);
-    double r_em = distance(earth, moon);
-
-    C.potential_energy =
-        -constants::G * (sun.mass * earth.mass / r_se + sun.mass * moon.mass / r_sm +
-                         earth.mass * moon.mass / r_em);
-
-    // ---- Total Energy ---- //
-    C.total_energy = C.kinetic_energy + C.potential_energy;
-
-    // ---- Linear Momentum ---- //
-    // P = Σ m v
-    {
-        vec3 P = sun.mass * sun.velocity + earth.mass * earth.velocity + moon.mass * moon.velocity;
-
-        C.P[0] = P.x();
-        C.P[1] = P.y();
-        C.P[2] = P.z();
-    }
-
-    // ---- Angular Momentum ---- //
-    auto Ls = angular_term(sun);
-    auto Le = angular_term(earth);
-    auto Lm = angular_term(moon);
-
-    C.L[0] = Ls[0] + Le[0] + Lm[0];
-    C.L[1] = Ls[1] + Le[1] + Lm[1];
-    C.L[2] = Ls[2] + Le[2] + Lm[2];
-
-    return C;
-}
-
 /***********************
  * compute (N-body overload)
  * @brief: Computes conservation laws for an arbitrary N-body system.

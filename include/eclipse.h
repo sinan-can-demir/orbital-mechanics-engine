@@ -19,7 +19,7 @@
 #ifndef ECLIPSE_H
 #define ECLIPSE_H
 
-#include "utils.h"
+#include "constants.h"
 #include "vec3.h"
 #include <cmath>
 

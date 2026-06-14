@@ -16,7 +16,7 @@
 #include "json_loader.h"
 #include "ray.h"
 #include "simulation.h"
-#include "utils.h"
+#include "constants.h"
 #include "validate.h"
 #include "vec3.h"
 #include <filesystem>

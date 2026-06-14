@@ -14,7 +14,8 @@ from pathlib import Path
 import numpy as np
 
 # --- Load simulation data ---
-df = pd.read_csv("build/orbit_three_body.csv")
+_root = Path(__file__).resolve().parent.parent
+df = pd.read_csv(_root / "build" / "orbit_three_body.csv")
 steps = len(df)
 
 # --- Define set axis equal function ---

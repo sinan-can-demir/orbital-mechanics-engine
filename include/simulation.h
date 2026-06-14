@@ -13,7 +13,7 @@
 #include "conservations.h"
 #include "eclipse.h"
 #include "rk45_coefficients.h"
-#include "utils.h"
+#include "constants.h"
 #include "vec3.h"
 #include <cmath>
 #include <fstream>
@@ -45,9 +45,6 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
 // ── Integration primitives ────────────────────────────────────────────────────
 // These are used internally by rk4Step and rk45Step.
 // Exposed so tests can call them directly if needed.
-
-// Evaluate derivatives at the current state (runs full force calculation)
-std::vector<StateDerivative> evaluateStateDerivatives(std::vector<CelestialBody>& bodies);
 
 // Build intermediate state: base + scale * d  (single derivative)
 std::vector<CelestialBody> buildIntermediateState(const std::vector<CelestialBody>& bodies,
@@ -135,6 +132,7 @@ struct RK45StepResult
     double dt_used = 0.0;
     double dt_next = 0.0;
     double error_norm = 0.0;
+    std::vector<StateDerivative> k7; // FSAL: pass back as k1_fsal on next accepted step
 };
 
 // Compute scaled RMS error norm for step acceptance decision.
@@ -144,10 +142,11 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
                         const std::vector<CelestialBody>& error, double atol, double rtol);
 
 // Attempt one adaptive RK45 step.
-// If error_norm < 1: accepts step, advances bodies, returns dt_next > dt
+// If error_norm < 1: accepts step, advances bodies, returns dt_next > dt, saves k7 for FSAL
 // If error_norm >= 1: rejects step, bodies unchanged, returns dt_next < dt
+// k1_fsal: if non-null, skip recomputing k1 (reuse k7 from previous accepted step)
 RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol = 1e-9,
-                        double rtol = 1e-9);
+                        double rtol = 1e-9, const std::vector<StateDerivative>* k1_fsal = nullptr);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,

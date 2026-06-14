@@ -31,7 +31,8 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b)
 
     if (r2 < 1.0)
     {
-        // Avoid singularities or extremely close approaches
+        std::cerr << "⚠️  bodies '" << a.name << "' and '" << b.name << "' are within 1 m (r²=" << r2
+                  << ") — gravitational force skipped.\n";
         return;
     }
 
@@ -221,7 +222,7 @@ void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
     constexpr double c1 = w1 / 2.0;            // ≈ +0.6756  (merged outer half-kicks)
     constexpr double c2 = (w0 + w1) / 2.0;     // ≈ −0.1756  (merged inner half-kicks)
 
-    // Palindromic DKD sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
+    // Palindromic KDK sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
     for (auto& b : bodies)
         b.velocity += b.acceleration * (c1 * dt);
     for (auto& b : bodies)
@@ -425,14 +426,19 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         result.body_masses.push_back(b.mass);
     }
 
+    void (*stepFn)(std::vector<CelestialBody>&, double) = nullptr;
+    if (integrator == Integrator::Leapfrog)
+        stepFn = leapfrogStep;
+    else if (integrator == Integrator::Yoshida4)
+        stepFn = yoshida4Step;
+    else if (integrator == Integrator::RK4)
+        stepFn = rk4Step;
+    else
+        throw std::invalid_argument("Unknown integrator");
+
     for (int i = 0; i < steps; ++i)
     {
-        if (integrator == Integrator::Leapfrog)
-            leapfrogStep(bodies, dt);
-        else if (integrator == Integrator::Yoshida4)
-            yoshida4Step(bodies, dt);
-        else
-            rk4Step(bodies, dt);
+        stepFn(bodies, dt);
 
         if (i % stride != 0)
             continue;
@@ -618,12 +624,13 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
  * @param rtol    Relative tolerance (dimensionless)
  * @return        RK45StepResult with acceptance flag and next dt suggestion
  ***********************/
-RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol, double rtol)
+RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol, double rtol,
+                        const std::vector<StateDerivative>* k1_fsal)
 {
     using namespace dp45;
 
-    // ── Stage 1: k1 at current state ─────────────────────────────────────────
-    auto k1 = evaluateDerivatives(bodies);
+    // ── Stage 1: k1 at current state (skip if FSAL k1 provided) ─────────────
+    auto k1 = k1_fsal ? *k1_fsal : evaluateDerivatives(bodies);
 
     // ── Stage 2: k2 at t + C2*dt ─────────────────────────────────────────────
     auto s2 = buildIntermediateState(bodies, k1, dt * A21);
@@ -723,12 +730,13 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
 
     if (error_norm <= 1.0)
     {
-        // Accept: advance bodies to y5
+        // Accept: advance bodies to y5, save k7 for FSAL reuse next step
         bodies = y5;
         result.accepted = true;
         result.dt_used = dt;
+        result.k7 = std::move(k7);
     }
-    // If rejected: bodies unchanged, caller retries with dt_next
+    // If rejected: bodies unchanged, caller retries with dt_next (k7 not reusable)
 
     return result;
 }
@@ -781,17 +789,23 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
     int n_steps = 0;
     int n_rejected = 0;
 
+    // FSAL: reuse k7 from each accepted step as k1 of the next
+    std::vector<StateDerivative> fsal_k1;
+    bool has_fsal = false;
+
     while (t < duration_s)
     {
         if (t + dt > duration_s)
             dt = duration_s - t;
 
-        auto step = rk45Step(bodies, dt, atol, rtol);
+        auto step = rk45Step(bodies, dt, atol, rtol, has_fsal ? &fsal_k1 : nullptr);
 
         if (step.accepted)
         {
             t += step.dt_used;
             ++n_steps;
+            fsal_k1 = std::move(step.k7);
+            has_fsal = true;
 
             if (t >= next_output)
             {
@@ -810,6 +824,7 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
         else
         {
             ++n_rejected;
+            has_fsal = false; // rejected step: k7 was at unaccepted y5, must recompute k1
         }
 
         dt = std::clamp(step.dt_next, dt_min, dt_max);

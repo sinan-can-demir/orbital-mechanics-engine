@@ -19,9 +19,7 @@ int main()
 
     std::vector<double> energy_errors;
 
-    // Seed accelerations — leapfrog requires this before first step
-    // (call updateAccelerations indirectly via first leapfrog call
-    //  or expose it — for now use the public leapfrog interface)
+    updateAccelerations(bodies); // required before first leapfrog step
 
     for (int i = 0; i < STEPS; ++i)
     {
