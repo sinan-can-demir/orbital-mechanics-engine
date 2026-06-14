@@ -37,14 +37,7 @@ struct Conservations
 };
 
 /***********************
- * compute (3-body overload)
- * @brief: Computes conservation quantities for Sun–Earth–Moon system.
- ***********************/
-Conservations compute(const CelestialBody& sun, const CelestialBody& earth,
-                      const CelestialBody& moon);
-
-/***********************
- * compute (N-body overload)
+ * compute
  * @brief: Computes conservation quantities for a general N-body system.
  * @param: bodies - collection of CelestialBody instances
  * @return: Conservations struct with energy, linear momentum, and angular

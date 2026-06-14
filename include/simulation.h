@@ -46,9 +46,6 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
 // These are used internally by rk4Step and rk45Step.
 // Exposed so tests can call them directly if needed.
 
-// Evaluate derivatives at the current state (runs full force calculation)
-std::vector<StateDerivative> evaluateStateDerivatives(std::vector<CelestialBody>& bodies);
-
 // Build intermediate state: base + scale * d  (single derivative)
 std::vector<CelestialBody> buildIntermediateState(const std::vector<CelestialBody>& bodies,
                                                   const std::vector<StateDerivative>& d,
