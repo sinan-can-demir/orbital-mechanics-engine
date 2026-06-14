@@ -22,8 +22,9 @@ from pathlib import Path
 # ============================
 # Load orbit and eclipse data
 # ============================
-orbit = pd.read_csv("build/orbit_three_body.csv")
-eclipse = pd.read_csv("build/eclipse_log.csv")
+_root = Path(__file__).resolve().parent.parent
+orbit = pd.read_csv(_root / "build" / "orbit_three_body.csv")
+eclipse = pd.read_csv(_root / "build" / "eclipse_log.csv")
 
 df = orbit.merge(eclipse, on="step", how="left")
 steps = len(df)
@@ -257,10 +258,10 @@ gif_path = results_dir / f"{path}.gif"
 
 print(f"Saving to: {results_dir}")
 try:
-#    if shutil.which("ffmpeg"):
-#        ani.save(mp4_path, writer="ffmpeg", fps=30)
-#        print(f"✅ Animation saved as {mp4_path}")
-    if shutil.which("magick") or shutil.which("convert"):
+    if shutil.which("ffmpeg"):
+        ani.save(mp4_path, writer="ffmpeg", fps=30)
+        print(f"✅ Animation saved as {mp4_path}")
+    elif shutil.which("magick") or shutil.which("convert"):
         ani.save(gif_path, writer="imagemagick", fps=30)
         print(f"✅ Animation saved as {gif_path}")
     else:
