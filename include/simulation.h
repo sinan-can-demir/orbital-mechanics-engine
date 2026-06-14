@@ -132,6 +132,7 @@ struct RK45StepResult
     double dt_used = 0.0;
     double dt_next = 0.0;
     double error_norm = 0.0;
+    std::vector<StateDerivative> k7; // FSAL: pass back as k1_fsal on next accepted step
 };
 
 // Compute scaled RMS error norm for step acceptance decision.
@@ -141,10 +142,12 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
                         const std::vector<CelestialBody>& error, double atol, double rtol);
 
 // Attempt one adaptive RK45 step.
-// If error_norm < 1: accepts step, advances bodies, returns dt_next > dt
+// If error_norm < 1: accepts step, advances bodies, returns dt_next > dt, saves k7 for FSAL
 // If error_norm >= 1: rejects step, bodies unchanged, returns dt_next < dt
+// k1_fsal: if non-null, skip recomputing k1 (reuse k7 from previous accepted step)
 RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol = 1e-9,
-                        double rtol = 1e-9);
+                        double rtol = 1e-9,
+                        const std::vector<StateDerivative>* k1_fsal = nullptr);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
