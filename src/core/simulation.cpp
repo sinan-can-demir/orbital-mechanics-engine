@@ -221,7 +221,7 @@ void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
     constexpr double c1 = w1 / 2.0;            // ≈ +0.6756  (merged outer half-kicks)
     constexpr double c2 = (w0 + w1) / 2.0;     // ≈ −0.1756  (merged inner half-kicks)
 
-    // Palindromic DKD sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
+    // Palindromic KDK sequence: kick c1, drift w1, kick c2, drift w0, kick c2, drift w1, kick c1
     for (auto& b : bodies)
         b.velocity += b.acceleration * (c1 * dt);
     for (auto& b : bodies)

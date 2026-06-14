@@ -18,7 +18,7 @@ import numpy as np
 
 _KERNEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'spice'))
 
-G = 6.674e-11  # m³ kg⁻¹ s⁻²
+G = 6.67430e-11  # m³ kg⁻¹ s⁻²  (CODATA 2018, matches physics::constants::G in utils.h)
 
 # Body definitions: name, NAIF position ID, SPICE GM body name
 # Position IDs match spice_validate.py for consistency
