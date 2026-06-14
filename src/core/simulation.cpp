@@ -31,8 +31,8 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b)
 
     if (r2 < 1.0)
     {
-        std::cerr << "⚠️  bodies '" << a.name << "' and '" << b.name
-                  << "' are within 1 m (r²=" << r2 << ") — gravitational force skipped.\n";
+        std::cerr << "⚠️  bodies '" << a.name << "' and '" << b.name << "' are within 1 m (r²=" << r2
+                  << ") — gravitational force skipped.\n";
         return;
     }
 
@@ -425,13 +425,17 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         result.body_names.push_back(b.name);
         result.body_masses.push_back(b.mass);
     }
-    
+
     void (*stepFn)(std::vector<CelestialBody>&, double) = nullptr;
-    if      (integrator == Integrator::Leapfrog) stepFn = leapfrogStep;
-    else if (integrator == Integrator::Yoshida4) stepFn = yoshida4Step;
-    else if (integrator == Integrator::RK4)      stepFn = rk4Step;
-    else throw std::invalid_argument("Unknown integrator");
-    
+    if (integrator == Integrator::Leapfrog)
+        stepFn = leapfrogStep;
+    else if (integrator == Integrator::Yoshida4)
+        stepFn = yoshida4Step;
+    else if (integrator == Integrator::RK4)
+        stepFn = rk4Step;
+    else
+        throw std::invalid_argument("Unknown integrator");
+
     for (int i = 0; i < steps; ++i)
     {
         stepFn(bodies, dt);

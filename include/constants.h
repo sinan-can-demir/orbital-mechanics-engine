@@ -29,9 +29,9 @@ constexpr double G = 6.67430e-11; // gravitational constant (m^3 kg^-1 s^-2)
 // ==============================
 // Body radii  (used by eclipse.cpp)
 // ==============================
-constexpr double R_SUN   = 6.957e8;  // m
-constexpr double R_EARTH = 6.371e6;  // m
-constexpr double R_MOON  = 1.737e6;  // m
+constexpr double R_SUN = 6.957e8;   // m
+constexpr double R_EARTH = 6.371e6; // m
+constexpr double R_MOON = 1.737e6;  // m
 
 } // namespace constants
 } // namespace physics

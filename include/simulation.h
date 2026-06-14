@@ -146,8 +146,7 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
 // If error_norm >= 1: rejects step, bodies unchanged, returns dt_next < dt
 // k1_fsal: if non-null, skip recomputing k1 (reuse k7 from previous accepted step)
 RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol = 1e-9,
-                        double rtol = 1e-9,
-                        const std::vector<StateDerivative>* k1_fsal = nullptr);
+                        double rtol = 1e-9, const std::vector<StateDerivative>* k1_fsal = nullptr);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,

@@ -230,9 +230,9 @@ int main(int argc, char** argv)
             try
             {
                 auto bodies = loadSystemFromJSON(opt.output);
-                int steps  = (opt.steps  == -1  ? 8766   : opt.steps);
-                double dt  = (opt.dt     == -1.0 ? 3600.0 : opt.dt);
-                int stride = (opt.stride == -1   ? 1      : opt.stride);
+                int steps = (opt.steps == -1 ? 8766 : opt.steps);
+                double dt = (opt.dt == -1.0 ? 3600.0 : opt.dt);
+                int stride = (opt.stride == -1 ? 1 : opt.stride);
                 const std::string runOut = opt.output + ".csv";
 
                 std::cout << "Running simulation after build:\n"

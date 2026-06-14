@@ -28,18 +28,17 @@ bool validateSystemFile(const std::string& path)
         }
 
         std::cout << "✅ System is valid: " << bodies.size() << " bodies\n";
-        
+
         bool valid = true;
 
         for (const auto& b : bodies)
         {
-            std::cout << " - " << b.name << " | mass = " << b.mass
-                      << " | pos = (" << b.position.x() << ", " << b.position.y() << ",  "
-                      << b.position.z() << ")"
+            std::cout << " - " << b.name << " | mass = " << b.mass << " | pos = (" << b.position.x()
+                      << ", " << b.position.y() << ",  " << b.position.z() << ")"
                       << " | vel = (" << b.velocity.x() << ", " << b.velocity.y() << ", "
                       << b.velocity.z() << ")"
                       << "\n";
-        
+
             if (b.mass <= 0.0)
             {
                 std::cout << "   ⚠️  Warning: non-positive mass.\n";
@@ -47,7 +46,6 @@ bool validateSystemFile(const std::string& path)
             }
         }
 
-        
         return valid;
     }
     catch (const std::exception& e)
