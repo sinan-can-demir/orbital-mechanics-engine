@@ -41,6 +41,9 @@ struct StateDerivative
 // ── Core force / acceleration ─────────────────────────────────────────────────
 void computeAcceleration(CelestialBody& earth, const CelestialBody& sun);
 void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
+// Schwarzschild 1PN correction: Δa = (GM/c²r³)[(4GM/r − v²)r + 4(r·v)v]
+// Applied after Newtonian forces. Treats the most massive body as the central attractor.
+void applyGRCorrection(std::vector<CelestialBody>& bodies);
 
 // ── Integration primitives ────────────────────────────────────────────────────
 // These are used internally by rk4Step and rk45Step.
@@ -98,19 +101,21 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath);
 
 // Pure physics — no file I/O. Used by Python bindings and internally by runSimulation().
 SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
-                                   Integrator integrator = Integrator::RK4, int stride = 1);
+                                   Integrator integrator = Integrator::RK4, int stride = 1,
+                                   bool use_gr = false);
 
 SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, double duration_s,
                                            double dt_initial, double output_interval_s = 3600.0,
                                            double atol = 1e-9, double rtol = 1e-9,
-                                           double dt_min = 1.0, double dt_max = 86400.0);
+                                           double dt_min = 1.0, double dt_max = 86400.0,
+                                           bool use_gr = false);
 
 // ── Fixed-step integrators ────────────────────────────────────────────────────
 void eulerStep(CelestialBody& body, double dt);
-void rk4Step(std::vector<CelestialBody>& bodies, double dt);
-void leapfrogStep(std::vector<CelestialBody>& bodies, double dt);
-void yoshida4Step(std::vector<CelestialBody>& bodies, double dt);
-void updateAccelerations(std::vector<CelestialBody>& bodies);
+void rk4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
+void leapfrogStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
+void yoshida4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
+void updateAccelerations(std::vector<CelestialBody>& bodies, bool use_gr = false);
 
 // ── RK45 adaptive integrator ──────────────────────────────────────────────────
 
@@ -146,17 +151,18 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
 // If error_norm >= 1: rejects step, bodies unchanged, returns dt_next < dt
 // k1_fsal: if non-null, skip recomputing k1 (reuse k7 from previous accepted step)
 RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol = 1e-9,
-                        double rtol = 1e-9, const std::vector<StateDerivative>* k1_fsal = nullptr);
+                        double rtol = 1e-9, const std::vector<StateDerivative>* k1_fsal = nullptr,
+                        bool use_gr = false);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
                    const std::string& outputPath, Integrator integrator = Integrator::RK4,
-                   int stride = 1);
+                   int stride = 1, bool use_gr = false);
 
 // RK45 overload — time-based instead of step-based
 void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
                            const std::string& outputPath, double output_interval_s = 3600.0,
                            double atol = 1e-9, double rtol = 1e-9, double dt_min = 1.0,
-                           double dt_max = 86400.0);
+                           double dt_max = 86400.0, bool use_gr = false);
 
 #endif // SIMULATION_H

@@ -5,12 +5,13 @@
 #include "simulation.h"
 #include "conservations.h"
 #include "json_loader.h"
-#include <iostream>
 #include <cmath>
+#include <functional>
+#include <iostream>
 #include <vector>
 
 static double maxEnergyDrift(std::vector<CelestialBody> bodies, int steps, double dt,
-                             void (*stepFn)(std::vector<CelestialBody>&, double))
+                             std::function<void(std::vector<CelestialBody>&, double)> stepFn)
 {
     auto C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
@@ -35,8 +36,11 @@ int main()
 
     auto bodies = loadSystemFromJSON("systems/earth_moon.json");
 
-    double maxErr_lf = maxEnergyDrift(bodies, STEPS, DT, leapfrogStep);
-    double maxErr_y4 = maxEnergyDrift(bodies, STEPS, DT, yoshida4Step);
+    auto lf = [](std::vector<CelestialBody>& b, double d) { leapfrogStep(b, d); };
+    auto y4 = [](std::vector<CelestialBody>& b, double d) { yoshida4Step(b, d); };
+
+    double maxErr_lf = maxEnergyDrift(bodies, STEPS, DT, lf);
+    double maxErr_y4 = maxEnergyDrift(bodies, STEPS, DT, y4);
 
     std::cout << "Max |dE/E| over 1 year (dt=1h):\n";
     std::cout << "  Leapfrog : " << maxErr_lf << "\n";

@@ -24,7 +24,8 @@ namespace constants
 // ==============================
 // Fundamental constants
 // ==============================
-constexpr double G = 6.67430e-11; // gravitational constant (m^3 kg^-1 s^-2)
+constexpr double G = 6.67430e-11;       // gravitational constant (m^3 kg^-1 s^-2)
+constexpr double C_LIGHT = 299792458.0; // speed of light (m/s, exact SI definition)
 
 // ==============================
 // Body radii  (used by eclipse.cpp)

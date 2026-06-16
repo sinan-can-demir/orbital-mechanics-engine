@@ -327,9 +327,11 @@ int main(int argc, char** argv)
                       << (integrator == Integrator::Leapfrog   ? "Leapfrog"
                           : integrator == Integrator::Yoshida4 ? "Yoshida4"
                                                                : "RK4")
+                      << "\n"
+                      << " - GR corr.:   " << (opt.use_gr ? "enabled (1PN Schwarzschild)" : "off")
                       << "\n";
 
-            runSimulation(bodies, steps, dt, outPath, integrator, stride);
+            runSimulation(bodies, steps, dt, outPath, integrator, stride, opt.use_gr);
         }
         catch (const std::exception& e)
         {

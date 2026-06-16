@@ -141,6 +141,10 @@ CLIOptions parseCLI(int argc, char** argv)
         {
             opt.normalize = true;
         }
+        else if (a == "--gr")
+        {
+            opt.use_gr = true;
+        }
         else if (a == "--run")
         {
             if (opt.command == "build-system")
@@ -191,10 +195,13 @@ void printCommandHelp(const std::string& cmd)
                   << "  --dt T                     Timestep in seconds\n"
                   << "  --stride N                 Write one CSV row every N steps (default: 1)\n"
                   << "  --integrator rk4|leapfrog|yoshida4  Integration method (default: rk4)\n"
-                  << "  --normalize                Shift system so COM=0 and net momentum=0\n\n"
+                  << "  --normalize                Shift system so COM=0 and net momentum=0\n"
+                  << "  --gr                       Enable Schwarzschild 1PN GR correction\n\n"
                   << "Example:\n"
                   << "  orbit-sim run --system systems/earth_moon.json"
-                     " --steps 5000000 --dt 60 --stride 1440\n";
+                     " --steps 5000000 --dt 60 --stride 1440\n"
+                  << "  orbit-sim run --system systems/solar_system.json"
+                     " --steps 87600 --dt 3600 --gr\n";
     }
 
     if (cmd == "info")

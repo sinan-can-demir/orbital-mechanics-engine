@@ -52,6 +52,7 @@ struct CLIOptions
     bool usePost = true;
     bool verbose = false;
     bool normalize = false;
+    bool use_gr = false;
 };
 
 CLIOptions parseCLI(int argc, char** argv);
