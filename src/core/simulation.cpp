@@ -10,6 +10,7 @@
 #include "vec3.h"
 #include <algorithm>
 #include <filesystem>
+#include <functional>
 
 /***********************
  * computeGravitationalForce
@@ -53,6 +54,49 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b)
 }
 
 /***********************
+ * applyGRCorrection
+ * @brief: Applies Schwarzschild 1PN post-Newtonian correction to all non-central bodies.
+ *
+ * Δa_i = (GM/c²r³) [ (4GM/r − v²) r + 4(r·v) v ]
+ *
+ * where r and v are measured relative to the most massive body (Sun).
+ * Must be called AFTER Newtonian accelerations are computed.
+ ***********************/
+void applyGRCorrection(std::vector<CelestialBody>& bodies)
+{
+    // Find most massive body (Sun in solar system simulations)
+    std::size_t sun_idx = 0;
+    for (std::size_t k = 1; k < bodies.size(); ++k)
+        if (bodies[k].mass > bodies[sun_idx].mass)
+            sun_idx = k;
+
+    const CelestialBody& sun = bodies[sun_idx];
+    const double GM = physics::constants::G * sun.mass;
+    constexpr double C2 = physics::constants::C_LIGHT * physics::constants::C_LIGHT;
+
+    for (std::size_t i = 0; i < bodies.size(); ++i)
+    {
+        if (i == sun_idx)
+            continue;
+
+        vec3 r = bodies[i].position - sun.position;
+        vec3 v = bodies[i].velocity - sun.velocity;
+        double r_mag = r.length();
+
+        if (r_mag == 0.0)
+            continue;
+
+        double r3 = r_mag * r_mag * r_mag;
+        double v2 = v.length_squared();
+        double rdv = dot(r, v);
+
+        // Schwarzschild 1PN: Δa = (GM/c²r³)[(4GM/r − v²)r + 4(r·v)v]
+        double factor = GM / (C2 * r3);
+        bodies[i].acceleration += factor * ((4.0 * GM / r_mag - v2) * r + 4.0 * rdv * v);
+    }
+}
+
+/***********************
  * eulerStep
  * @brief: Simple Euler integration step (unused in main loop but kept for
  * reference).
@@ -84,8 +128,9 @@ void resetAccelerations(std::vector<CelestialBody>& bodies)
  * @brief: Recomputes gravitational accelerations for the entire system.
  * @note: Uses computeGravitationalForce pairwise with i < j
  *        to ensure Newton's 3rd law and avoid double-counting.
+ *        If use_gr is true, applies Schwarzschild 1PN correction after Newtonian forces.
  ***********************/
-void updateAccelerations(std::vector<CelestialBody>& bodies)
+void updateAccelerations(std::vector<CelestialBody>& bodies, bool use_gr)
 {
     resetAccelerations(bodies);
 
@@ -97,6 +142,9 @@ void updateAccelerations(std::vector<CelestialBody>& bodies)
             computeGravitationalForce(bodies[i], bodies[j]);
         }
     }
+
+    if (use_gr)
+        applyGRCorrection(bodies);
 }
 
 /***********************
@@ -105,9 +153,9 @@ void updateAccelerations(std::vector<CelestialBody>& bodies)
  * @param: bodies - current state
  * @return: vector of StateDerivative (dpos, dvel) for each body
  ***********************/
-std::vector<StateDerivative> evaluateDerivatives(std::vector<CelestialBody>& bodies)
+std::vector<StateDerivative> evaluateDerivatives(std::vector<CelestialBody>& bodies, bool use_gr)
 {
-    updateAccelerations(bodies);
+    updateAccelerations(bodies, use_gr);
     std::vector<StateDerivative> d(bodies.size());
 
     for (std::size_t i = 0; i < bodies.size(); ++i)
@@ -146,23 +194,24 @@ std::vector<CelestialBody> buildIntermediateState(const std::vector<CelestialBod
  * @brief: Classical RK4 solver for N-body system.
  * @param: bodies - state to be advanced in time
  * @param: dt     - time step
+ * @param: use_gr - if true, apply 1PN GR correction at each derivative evaluation
  * @exception: none
  * @return: none
  ***********************/
-void rk4Step(std::vector<CelestialBody>& bodies, double dt)
+void rk4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
 {
     if (bodies.empty())
         return;
 
-    auto k1 = evaluateDerivatives(bodies);
+    auto k1 = evaluateDerivatives(bodies, use_gr);
     auto s2 = buildIntermediateState(bodies, k1, dt * 0.5);
-    auto k2 = evaluateDerivatives(s2);
+    auto k2 = evaluateDerivatives(s2, use_gr);
 
     auto s3 = buildIntermediateState(bodies, k2, dt * 0.5);
-    auto k3 = evaluateDerivatives(s3);
+    auto k3 = evaluateDerivatives(s3, use_gr);
 
     auto s4 = buildIntermediateState(bodies, k3, dt);
-    auto k4 = evaluateDerivatives(s4);
+    auto k4 = evaluateDerivatives(s4, use_gr);
 
     const double sixth = dt / 6.0;
     for (std::size_t i = 0; i < bodies.size(); ++i)
@@ -181,11 +230,12 @@ void rk4Step(std::vector<CelestialBody>& bodies, double dt)
  * velocities in a staggered manner to improve energy conservation over long timescales.
  * @param bodies
  * @param dt
+ * @param use_gr - if true, apply 1PN GR correction when recomputing accelerations
  * @exception none
  * @return none
  * @note: Requires that accelerations are already computed before the first call.
  */
-void leapfrogStep(std::vector<CelestialBody>& bodies, double dt)
+void leapfrogStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
 {
     // Step 1: half-kick velocity using current accelerations
     // (accelerations must already be computed before first call)
@@ -197,7 +247,7 @@ void leapfrogStep(std::vector<CelestialBody>& bodies, double dt)
         b.position += b.velocity * dt;
 
     // Step 3: recompute accelerations at new positions
-    updateAccelerations(bodies);
+    updateAccelerations(bodies, use_gr);
 
     // Step 4: second half-kick with new accelerations
     for (auto& b : bodies)
@@ -208,11 +258,12 @@ void leapfrogStep(std::vector<CelestialBody>& bodies, double dt)
  * yoshida4Step
  *
  * @brief: 4th-order symplectic integrator via Yoshida (1990) triple-Leapfrog composition.
+ * @param use_gr - if true, apply 1PN GR correction when recomputing accelerations
  * @note: Requires accelerations pre-computed before first call (same as leapfrogStep).
  *        3 force evaluations per step vs 1 for Leapfrog, but achieves O(dt^5) error
  *        vs O(dt^3) — a much larger timestep can be used for equivalent accuracy.
  */
-void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
+void yoshida4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
 {
     // Yoshida (1990) coefficients: compose Leapfrog(w1) ∘ Leapfrog(w0) ∘ Leapfrog(w1)
     // w0 is negative — the middle sub-step reverses direction to cancel error terms.
@@ -227,19 +278,19 @@ void yoshida4Step(std::vector<CelestialBody>& bodies, double dt)
         b.velocity += b.acceleration * (c1 * dt);
     for (auto& b : bodies)
         b.position += b.velocity * (w1 * dt);
-    updateAccelerations(bodies);
+    updateAccelerations(bodies, use_gr);
 
     for (auto& b : bodies)
         b.velocity += b.acceleration * (c2 * dt);
     for (auto& b : bodies)
         b.position += b.velocity * (w0 * dt);
-    updateAccelerations(bodies);
+    updateAccelerations(bodies, use_gr);
 
     for (auto& b : bodies)
         b.velocity += b.acceleration * (c2 * dt);
     for (auto& b : bodies)
         b.position += b.velocity * (w1 * dt);
-    updateAccelerations(bodies); // leave accelerations current for next step
+    updateAccelerations(bodies, use_gr); // leave accelerations current for next step
 
     for (auto& b : bodies)
         b.velocity += b.acceleration * (c1 * dt);
@@ -394,18 +445,19 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
 }
 
 /********************
- * runSimulation
- * @brief: Generic N-body simulation runner using RK4 integrator.
+ * runSimulationCore
+ * @brief: Generic N-body simulation runner.
  * @param bodies     - vector of CelestialBody objects (from JSON)
  * @param steps      - number of steps to simulate
  * @param dt         - timestep in seconds
- * @param outputPath - CSV output file path
  * @param integrator  - integration method to use (default: RK4)
+ * @param stride     - record every Nth step
+ * @param use_gr     - if true, apply 1PN GR correction each step
  * @exception none
- * @return none
+ * @return SimulationResult
  *********************/
 SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
-                                   Integrator integrator, int stride)
+                                   Integrator integrator, int stride, bool use_gr)
 {
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
@@ -413,7 +465,7 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
     if (integrator == Integrator::Leapfrog || integrator == Integrator::Yoshida4)
-        updateAccelerations(bodies);
+        updateAccelerations(bodies, use_gr);
 
     SimulationResult result;
     result.dt = dt;
@@ -426,13 +478,15 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         result.body_masses.push_back(b.mass);
     }
 
-    void (*stepFn)(std::vector<CelestialBody>&, double) = nullptr;
+    // Use std::function to capture use_gr without changing the step function signatures
+    // visible at the call sites (lambdas forward the flag).
+    std::function<void(std::vector<CelestialBody>&, double)> stepFn;
     if (integrator == Integrator::Leapfrog)
-        stepFn = leapfrogStep;
+        stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { leapfrogStep(b, d, use_gr); };
     else if (integrator == Integrator::Yoshida4)
-        stepFn = yoshida4Step;
+        stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { yoshida4Step(b, d, use_gr); };
     else if (integrator == Integrator::RK4)
-        stepFn = rk4Step;
+        stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { rk4Step(b, d, use_gr); };
     else
         throw std::invalid_argument("Unknown integrator");
 
@@ -457,7 +511,7 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
 }
 
 void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
-                   const std::string& outputPath, Integrator integrator, int stride)
+                   const std::string& outputPath, Integrator integrator, int stride, bool use_gr)
 {
     if (bodies.empty())
     {
@@ -465,7 +519,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
         return;
     }
 
-    SimulationResult result = runSimulationCore(bodies, steps, dt, integrator, stride);
+    SimulationResult result = runSimulationCore(bodies, steps, dt, integrator, stride, use_gr);
 
     // ── Eclipse logging from stored positions ─────────────────────────────────
     int idxSun = -1, idxEarth = -1, idxMoon = -1;
@@ -616,25 +670,26 @@ double computeErrorNorm(const std::vector<CelestialBody>& y_old,
  *
  * FSAL property: k6 evaluated at y5 = k1 of the next step.
  * This saves one force evaluation per accepted step.
- * (Not yet exploited here — left as future optimization.)
  *
  * @param bodies  System state (modified in place if step accepted)
  * @param dt      Proposed timestep
  * @param atol    Absolute tolerance (meters / m/s)
  * @param rtol    Relative tolerance (dimensionless)
+ * @param k1_fsal If non-null, reuse as k1 (FSAL from previous accepted step)
+ * @param use_gr  If true, apply 1PN GR correction at each derivative evaluation
  * @return        RK45StepResult with acceptance flag and next dt suggestion
  ***********************/
 RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double atol, double rtol,
-                        const std::vector<StateDerivative>* k1_fsal)
+                        const std::vector<StateDerivative>* k1_fsal, bool use_gr)
 {
     using namespace dp45;
 
     // ── Stage 1: k1 at current state (skip if FSAL k1 provided) ─────────────
-    auto k1 = k1_fsal ? *k1_fsal : evaluateDerivatives(bodies);
+    auto k1 = k1_fsal ? *k1_fsal : evaluateDerivatives(bodies, use_gr);
 
     // ── Stage 2: k2 at t + C2*dt ─────────────────────────────────────────────
     auto s2 = buildIntermediateState(bodies, k1, dt * A21);
-    auto k2 = evaluateDerivatives(s2);
+    auto k2 = evaluateDerivatives(s2, use_gr);
 
     // ── Stage 3: k3 at t + C3*dt ─────────────────────────────────────────────
     auto s3 = buildIntermediateStateMulti(bodies,
@@ -643,7 +698,7 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                                               {A32, &k2},
                                           },
                                           dt);
-    auto k3 = evaluateDerivatives(s3);
+    auto k3 = evaluateDerivatives(s3, use_gr);
 
     // ── Stage 4: k4 at t + C4*dt ─────────────────────────────────────────────
     auto s4 = buildIntermediateStateMulti(bodies,
@@ -653,7 +708,7 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                                               {A43, &k3},
                                           },
                                           dt);
-    auto k4 = evaluateDerivatives(s4);
+    auto k4 = evaluateDerivatives(s4, use_gr);
 
     // ── Stage 5: k5 at t + C5*dt ─────────────────────────────────────────────
     auto s5 = buildIntermediateStateMulti(bodies,
@@ -664,7 +719,7 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                                               {A54, &k4},
                                           },
                                           dt);
-    auto k5 = evaluateDerivatives(s5);
+    auto k5 = evaluateDerivatives(s5, use_gr);
 
     // ── Stage 6: k6 at t + dt ────────────────────────────────────────────────
     auto s6 = buildIntermediateStateMulti(bodies,
@@ -676,7 +731,7 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                                               {A65, &k5},
                                           },
                                           dt);
-    auto k6 = evaluateDerivatives(s6);
+    auto k6 = evaluateDerivatives(s6, use_gr);
 
     // ── 5th-order solution y5 ─────────────────────────────────────────────────
     // y5 = y_n + dt*(B1*k1 + B3*k3 + B4*k4 + B5*k5 + B6*k6)
@@ -692,7 +747,7 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                                           dt);
 
     // ── k7 at y5 (FSAL: this will be k1 of the next step) ────────────────────
-    auto k7 = evaluateDerivatives(y5);
+    auto k7 = evaluateDerivatives(y5, use_gr);
 
     // ── Error estimate: y5 - y4 ───────────────────────────────────────────────
     // err = dt*(E1*k1 + E3*k3 + E4*k4 + E5*k5 + E6*k6 + E7*k7)
@@ -742,26 +797,26 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
 }
 
 /***********************
- * runSimulationAdaptive
- * @brief: Adaptive RK45 simulation runner.
+ * runSimulationAdaptiveCore
+ * @brief: Adaptive RK45 simulation runner (pure physics, no file I/O).
  *
- * Unlike runSimulation() which uses a fixed step count,
+ * Unlike runSimulationCore() which uses a fixed step count,
  * this runs until t >= duration_s, writing output every
  * output_interval_s seconds of simulated time.
  *
  * @param bodies            System to simulate (modified in place)
  * @param duration_s        Total simulated time in seconds
  * @param dt_initial        Starting timestep guess
- * @param outputPath        CSV output file path
  * @param output_interval_s Write a CSV row every N simulated seconds
  * @param atol              Absolute tolerance (m / m/s)
  * @param rtol              Relative tolerance (dimensionless)
  * @param dt_min            Minimum allowed timestep
  * @param dt_max            Maximum allowed timestep
+ * @param use_gr            If true, apply 1PN GR correction each step
  ***********************/
 SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, double duration_s,
                                            double dt_initial, double output_interval_s, double atol,
-                                           double rtol, double dt_min, double dt_max)
+                                           double rtol, double dt_min, double dt_max, bool use_gr)
 {
     if (bodies.empty())
     {
@@ -798,7 +853,7 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
         if (t + dt > duration_s)
             dt = duration_s - t;
 
-        auto step = rk45Step(bodies, dt, atol, rtol, has_fsal ? &fsal_k1 : nullptr);
+        auto step = rk45Step(bodies, dt, atol, rtol, has_fsal ? &fsal_k1 : nullptr, use_gr);
 
         if (step.accepted)
         {
@@ -841,9 +896,9 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
 
 void runSimulationAdaptive(std::vector<CelestialBody>& bodies, double duration_s, double dt_initial,
                            const std::string& outputPath, double output_interval_s, double atol,
-                           double rtol, double dt_min, double dt_max)
+                           double rtol, double dt_min, double dt_max, bool use_gr)
 {
     SimulationResult result = runSimulationAdaptiveCore(
-        bodies, duration_s, dt_initial, output_interval_s, atol, rtol, dt_min, dt_max);
+        bodies, duration_s, dt_initial, output_interval_s, atol, rtol, dt_min, dt_max, use_gr);
     exportCSV(result, outputPath);
 }
