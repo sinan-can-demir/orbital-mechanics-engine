@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(ORBITAL-MECHANICS-ENGINE VERSION 1.0 LANGUAGES C CXX)
+project(ORBITAL-MECHANICS-ENGINE VERSION 2.0 LANGUAGES C CXX)
 
 # ------------------------------------------------------------
 # Global Settings
