@@ -17,6 +17,9 @@ import pandas as pd
 data_file = pick_csv("Select conservation CSV:", conservation=True)
 df = pd.read_csv(data_file, comment='#')
 
+# Derive a title from the filename (e.g. "orbit" or "verify_refactor")
+stem = data_file.split("/")[-1].replace("_conservation.csv", "").replace("_", " ").title()
+
 # Energy components
 plot_multi(df,
     series=[
@@ -24,7 +27,7 @@ plot_multi(df,
         ("PE",      "Potential Energy", "orange"),
         ("E_total", "Total Energy",     "black"),
     ],
-    title="Energy Conservation — Sun–Earth–Moon",
+    title=f"Energy Conservation — {stem}",
     ylabel="Energy (J)",
     out_path="results/conservation-graphs/energy.png"
 )
@@ -32,7 +35,7 @@ plot_multi(df,
 # Drift
 plot_conservation(df,
     y_col    = "dE_rel",
-    title    = "Relative Energy Drift",
+    title    = f"Relative Energy Drift — {stem}",
     ylabel   = "ΔE / E₀",
     out_path = "results/conservation-graphs/energy_drift.png",
     color    = "red"

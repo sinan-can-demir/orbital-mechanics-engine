@@ -19,13 +19,14 @@ from utils import pick_csv, load_csv, plot_conservation, plot_multi
 data_file = pick_csv("Select conservation CSV:", conservation=True)
 df        = load_csv(data_file)
 
+stem    = data_file.split("/")[-1].replace("_conservation.csv", "").replace("_", " ").title()
 out_dir = "results/conservation-graphs"
 
 # ── Plot 1: Angular momentum magnitude ────────────────────────────────────────
 
 plot_conservation(df,
     y_col    = "Lmag",
-    title    = "Total Angular Momentum  |L|",
+    title    = f"Total Angular Momentum  |L| — {stem}",
     ylabel   = "|L|  (kg·m²/s)",
     out_path = f"{out_dir}/angular_momentum.png",
     color    = "#1f77b4"
@@ -35,7 +36,7 @@ plot_conservation(df,
 
 plot_conservation(df,
     y_col    = "dL_rel",
-    title    = "Relative Angular Momentum Drift  |ΔL / L₀|",
+    title    = f"Relative Angular Momentum Drift — {stem}",
     ylabel   = "ΔL / L₀",
     out_path = f"{out_dir}/angular_momentum_drift.png",
     color    = "#9467bd"
@@ -49,7 +50,7 @@ plot_multi(df,
         ("Ly", "Ly", "#ff7f0e"),
         ("Lz", "Lz", "#2ca02c"),
     ],
-    title    = "Angular Momentum Components",
+    title    = f"Angular Momentum Components — {stem}",
     ylabel   = "L  (kg·m²/s)",
     out_path = f"{out_dir}/angular_momentum_components.png"
 )
