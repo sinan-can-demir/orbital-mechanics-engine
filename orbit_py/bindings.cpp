@@ -64,6 +64,7 @@ PYBIND11_MODULE(orbit, m)
         .value("RK45", Integrator::RK45)
         .value("Euler", Integrator::euler)
         .value("Yoshida4", Integrator::Yoshida4)
+        .value("Hermite", Integrator::Hermite)
         .export_values();
 
     py::class_<ConservationSnapshot>(m, "ConservationSnapshot")
