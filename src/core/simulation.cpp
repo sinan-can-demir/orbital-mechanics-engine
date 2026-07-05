@@ -296,6 +296,99 @@ void yoshida4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
         b.velocity += b.acceleration * (c1 * dt);
 }
 
+/***********************
+ * computeJerks
+ * @brief: Computes da/dt (jerk) for every body from pairwise Newtonian gravity.
+ *
+ * da_i/dt = G * m_j * [ v_ij/r^3 - 3*(r_ij . v_ij)*r_ij/r^5 ],  pairwise i<j (Newton's 3rd law)
+ *
+ * @note: Required by hermiteStep. Not folded into computeGravitationalForce since no other
+ *        integrator needs it, and jerk has no field on CelestialBody.
+ *        Does NOT include a jerk contribution from the GR correction (see applyGRCorrection) —
+ *        hermiteStep applies GR to acceleration only, as an approximation.
+ ***********************/
+std::vector<vec3> computeJerks(const std::vector<CelestialBody>& bodies)
+{
+    std::vector<vec3> jerks(bodies.size(), vec3(0.0, 0.0, 0.0));
+    const std::size_t N = bodies.size();
+
+    for (std::size_t i = 0; i < N; ++i)
+    {
+        for (std::size_t j = i + 1; j < N; ++j)
+        {
+            vec3 r_vec = bodies[j].position - bodies[i].position;
+            vec3 v_vec = bodies[j].velocity - bodies[i].velocity;
+            double r2 = r_vec.length_squared();
+
+            if (r2 < 1.0) // mirrors the close-approach guard in computeGravitationalForce
+                continue;
+
+            double r = std::sqrt(r2);
+            double invr3 = 1.0 / (r * r2);
+            double invr5 = invr3 / r2;
+            double rdotv = dot(r_vec, v_vec);
+
+            vec3 jerk_dir = v_vec * invr3 - (3.0 * rdotv * invr5) * r_vec;
+
+            jerks[i] += (physics::constants::G * bodies[j].mass) * jerk_dir;
+            jerks[j] += (-physics::constants::G * bodies[i].mass) * jerk_dir;
+        }
+    }
+    return jerks;
+}
+
+/***********************
+ * hermiteStep
+ * @brief: 4th-order Hermite predictor-corrector (Makino & Aarseth 1992).
+ * @param use_gr - if true, apply 1PN GR correction to acceleration (not jerk — approximation)
+ * @note: Requires bodies[i].acceleration valid at the current state before the first call
+ *        (same precondition as leapfrogStep). Leaves it valid at the corrected state on return.
+ *
+ * Predict:  x_p = x + v*dt + a*dt^2/2 + j*dt^3/6
+ *           v_p = v + a*dt + j*dt^2/2
+ * Evaluate: a_p, j_p at the predicted state
+ * Correct:  v1 = v + (a+a_p)/2*dt + (j-j_p)/12*dt^2
+ *           x1 = x + (v+v1)/2*dt + (a-a_p)/12*dt^2
+ ***********************/
+void hermiteStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
+{
+    if (bodies.empty())
+        return;
+
+    std::vector<vec3> jerk0 = computeJerks(bodies);
+
+    std::vector<CelestialBody> predicted = bodies;
+    for (std::size_t i = 0; i < bodies.size(); ++i)
+    {
+        const vec3& a0 = bodies[i].acceleration;
+        const vec3& j0 = jerk0[i];
+        predicted[i].position = bodies[i].position + bodies[i].velocity * dt +
+                                a0 * (0.5 * dt * dt) + j0 * (dt * dt * dt / 6.0);
+        predicted[i].velocity = bodies[i].velocity + a0 * dt + j0 * (0.5 * dt * dt);
+    }
+
+    updateAccelerations(predicted, use_gr);
+    std::vector<vec3> jerk1 = computeJerks(predicted);
+
+    const double dt2_12 = dt * dt / 12.0;
+    for (std::size_t i = 0; i < bodies.size(); ++i)
+    {
+        const vec3& a0 = bodies[i].acceleration;
+        const vec3& a1 = predicted[i].acceleration;
+        const vec3& j0 = jerk0[i];
+        const vec3& j1 = jerk1[i];
+
+        vec3 vel_new = bodies[i].velocity + 0.5 * dt * (a0 + a1) + dt2_12 * (j0 - j1);
+        vec3 pos_new =
+            bodies[i].position + 0.5 * dt * (bodies[i].velocity + vel_new) + dt2_12 * (a0 - a1);
+
+        bodies[i].position = pos_new;
+        bodies[i].velocity = vel_new;
+    }
+
+    updateAccelerations(bodies, use_gr); // leave acceleration current for next call
+}
+
 /********************
  * detectSEM
  * @brief: Detects indices of Sun, Earth, and Moon in the bodies vector.
@@ -464,7 +557,8 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
     double P0mag = std::sqrt(C0.P[0] * C0.P[0] + C0.P[1] * C0.P[1] + C0.P[2] * C0.P[2]);
 
-    if (integrator == Integrator::Leapfrog || integrator == Integrator::Yoshida4)
+    if (integrator == Integrator::Leapfrog || integrator == Integrator::Yoshida4 ||
+        integrator == Integrator::Hermite)
         updateAccelerations(bodies, use_gr);
 
     SimulationResult result;
@@ -485,6 +579,8 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { leapfrogStep(b, d, use_gr); };
     else if (integrator == Integrator::Yoshida4)
         stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { yoshida4Step(b, d, use_gr); };
+    else if (integrator == Integrator::Hermite)
+        stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { hermiteStep(b, d, use_gr); };
     else if (integrator == Integrator::RK4)
         stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { rk4Step(b, d, use_gr); };
     else

@@ -28,6 +28,7 @@ enum class Integrator
     RK45,
     euler,
     Yoshida4,
+    Hermite,
 };
 
 // ── Internal derivative type ──────────────────────────────────────────────────
@@ -116,6 +117,12 @@ void rk4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false)
 void leapfrogStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
 void yoshida4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
 void updateAccelerations(std::vector<CelestialBody>& bodies, bool use_gr = false);
+
+// ── Hermite predictor-corrector (Makino & Aarseth 1992) ───────────────────────
+// Requires jerk (da/dt), which no other integrator here needs, so it is computed
+// on the fly rather than stored on CelestialBody.
+std::vector<vec3> computeJerks(const std::vector<CelestialBody>& bodies);
+void hermiteStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
 
 // ── RK45 adaptive integrator ──────────────────────────────────────────────────
 

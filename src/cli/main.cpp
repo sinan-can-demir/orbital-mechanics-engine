@@ -307,10 +307,12 @@ int main(int argc, char** argv)
                 integrator = Integrator::Leapfrog;
             else if (opt.integrator == "yoshida4")
                 integrator = Integrator::Yoshida4;
+            else if (opt.integrator == "hermite")
+                integrator = Integrator::Hermite;
             else if (!opt.integrator.empty() && opt.integrator != "rk4")
             {
                 std::cerr << "❌ Unknown integrator: " << opt.integrator
-                          << ". Valid options: rk4, leapfrog, yoshida4\n";
+                          << ". Valid options: rk4, leapfrog, yoshida4, hermite\n";
                 return 1;
             }
 
@@ -326,6 +328,7 @@ int main(int argc, char** argv)
                       << " - Integrator: "
                       << (integrator == Integrator::Leapfrog   ? "Leapfrog"
                           : integrator == Integrator::Yoshida4 ? "Yoshida4"
+                          : integrator == Integrator::Hermite  ? "Hermite"
                                                                : "RK4")
                       << "\n"
                       << " - GR corr.:   " << (opt.use_gr ? "enabled (1PN Schwarzschild)" : "off")
