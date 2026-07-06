@@ -4,7 +4,7 @@ A high-performance **C++17 N-body gravitational simulator** with adaptive integr
 
 [![CI](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21215317.svg)](https://doi.org/10.5281/zenodo.21215317)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21215316.svg)](https://doi.org/10.5281/zenodo.21215316)
 
 ---
 
