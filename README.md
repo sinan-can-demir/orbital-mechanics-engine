@@ -4,12 +4,13 @@ A high-performance **C++17 N-body gravitational simulator** with adaptive integr
 
 [![CI](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/sinan-can-demir/orbital-mechanics-engine/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21215317.svg)](https://doi.org/10.5281/zenodo.21215317)
 
 ---
 
 ## Features
 
-- **Three integrators** — RK4 (fixed-step), Leapfrog (symplectic), and RK45 Dormand-Prince (adaptive timestep)
+- **Five integrators** — RK4 (fixed-step), Leapfrog (symplectic), Yoshida4 (4th-order symplectic), RK45 Dormand-Prince (adaptive timestep), and Hermite (4th-order predictor-corrector)
 - **Full N-body Newtonian gravity** — arbitrary number of bodies, pairwise forces, Newton's third law
 - **Conservation monitoring** — energy, linear momentum, and angular momentum tracked at every step
 - **NASA JPL HORIZONS integration** — fetch real ephemeris data and build system files automatically
@@ -22,14 +23,14 @@ A high-performance **C++17 N-body gravitational simulator** with adaptive integr
 
 ## Why this project?
 
-Orbital Mechanics Engine is designed for students, educators, and researchers who want to simulate gravitational systems and experiment with different integration methods. Unlike black-box solvers, swapping integrators requires changing a single argument — making it easy to compare accuracy, performance, and stability across RK4, Leapfrog, and RK45 without rewriting any simulation code.
+Orbital Mechanics Engine is designed for students, educators, and researchers who want to simulate gravitational systems and experiment with different integration methods. Unlike black-box solvers, swapping integrators requires changing a single argument — making it easy to compare accuracy, performance, and stability across RK4, Leapfrog, Yoshida4, RK45, and Hermite without rewriting any simulation code.
 
 ## Who is this for?
 
 | If you want to... | Use this |
 |---|---|
 | Run a simulation and plot results in Python | `orbit.simulate()` + Jupyter notebooks in `examples/` |
-| Compare integrator accuracy side by side | `orbit.Integrator.RK4` / `Leapfrog` / `RK45` — one argument |
+| Compare integrator accuracy side by side | `orbit.Integrator.RK4` / `Leapfrog` / `Yoshida4` / `RK45` / `Hermite` — one argument |
 | Simulate with real planetary positions from NASA | `make build-solar-system` then `orbit.simulate()` |
 | Watch the simulation in real time | `make build` + `make view` (OpenGL viewer) |
 | Run from the command line without Python | `./build/bin/orbit-sim run --system systems/solar_system.json` |
@@ -163,8 +164,13 @@ done
 |----------|-------------|
 | [01_solar_system.ipynb](examples/01_solar_system.ipynb) | Full solar system — orbital trajectories and energy conservation |
 | [02_earth_moon.ipynb](examples/02_earth_moon.ipynb) | Earth-Moon system with real NASA HORIZONS data — lunar orbit and perigee/apogee |
-| [03_integrator_comparison.ipynb](examples/03_integrator_comparison.ipynb) | RK4 vs Leapfrog vs RK45 — energy drift side-by-side |
+| [03_integrator_comparison.ipynb](examples/03_integrator_comparison.ipynb) | RK4 vs Leapfrog vs Yoshida4 vs RK45 vs Hermite — energy drift side-by-side |
 | [04_rk45_adaptive.ipynb](examples/04_rk45_adaptive.ipynb) | RK45 adaptive timestep history — how the integrator responds to orbital dynamics |
+| [05_rebound_earth_moon.ipynb](examples/05_rebound_earth_moon.ipynb) | Earth-Moon (3-body) vs REBOUND's IAS15 and WHFast — wall-clock time and energy drift |
+| [06_rebound_solar_system.ipynb](examples/06_rebound_solar_system.ipynb) | Full solar system (10-body) vs REBOUND — same benchmarks at larger N |
+| [07_spice_validation.ipynb](examples/07_spice_validation.ipynb) | Validation against DE440 SPICE ephemerides |
+| [08_yoshida4.ipynb](examples/08_yoshida4.ipynb) | Yoshida4 symplectic integrator — long-term energy conservation |
+| [09_mercury_gr_precession.ipynb](examples/09_mercury_gr_precession.ipynb) | Mercury perihelion precession — Schwarzschild 1PN GR correction validation |
 
 ---
 
