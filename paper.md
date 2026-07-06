@@ -10,6 +10,7 @@ tags:
   - post-Newtonian
 authors:
   - name: Sinan Can Demir
+    orcid: 0009-0003-8082-1000
     affiliation: 1
 affiliations:
   - name: University of Texas at Dallas
@@ -20,7 +21,7 @@ bibliography: paper.bib
 
 # Summary
 
-The Orbital Mechanics Engine is a high-performance C++ library for simulating gravitational N-body systems, exposed to the scientific Python ecosystem via pybind11 bindings and a standalone command-line interface. It implements four numerical integrators — classical fourth-order Runge-Kutta (RK4), symplectic Leapfrog, fourth-order symplectic Yoshida, and adaptive Dormand-Prince RK45 — alongside a Schwarzschild first post-Newtonian (1PN) general relativistic correction. Initial conditions can be sourced directly from the NASA JPL Horizons service or from DE440 ephemerides validated against SPICE kernels. Conservation quantities (total energy, angular momentum, linear momentum) are tracked at every output step, and solar eclipse geometry (umbra and penumbra) is computed as a post-processing pass over the stored trajectory.
+The Orbital Mechanics Engine is a high-performance C++ library for simulating gravitational N-body systems, exposed to the scientific Python ecosystem via pybind11 bindings and a standalone command-line interface. It implements five numerical integrators — classical fourth-order Runge-Kutta (RK4), symplectic Leapfrog, fourth-order symplectic Yoshida, adaptive Dormand-Prince RK45, and a fourth-order Hermite predictor-corrector — alongside a Schwarzschild first post-Newtonian (1PN) general relativistic correction. Initial conditions can be sourced directly from the NASA JPL Horizons service or from DE440 ephemerides validated against SPICE kernels. Conservation quantities (total energy, angular momentum, linear momentum) are tracked at every output step, and solar eclipse geometry (umbra and penumbra) is computed as a post-processing pass over the stored trajectory.
 
 # Statement of Need
 
@@ -32,12 +33,13 @@ The Orbital Mechanics Engine fills this gap. It is self-contained (no external s
 
 ## Numerical Integrators
 
-Four integration methods are provided, selectable at runtime via both the CLI (`--integrator`) and Python (`integrator=` keyword):
+Five integration methods are provided, selectable at runtime via both the CLI (`--integrator`) and Python (`integrator=` keyword):
 
 - **RK4** — Classical fourth-order Runge-Kutta. Four force evaluations per step; $O(\Delta t^5)$ local truncation error. Suitable for short integrations where energy drift is acceptable.
 - **Leapfrog (Störmer-Verlet)** — Second-order symplectic integrator. One force evaluation per step; time-reversible and symplectic, so energy oscillates rather than drifts over long integrations.
 - **Yoshida4** — Fourth-order symplectic integrator via triple composition of Leapfrog substeps [@yoshida1990]. Three force evaluations per step; substantially tighter energy bounds than Leapfrog at the same timestep while preserving the symplectic property.
 - **RK45 (Dormand-Prince)** — Adaptive fifth-order integrator with embedded fourth-order error estimate [@dormand1980]. Step size is controlled by a scaled RMS error norm; the First Same As Last (FSAL) property reduces effective cost to five force evaluations per accepted step. The timestep bounds $\Delta t_\text{min}$ and $\Delta t_\text{max}$ are user-configurable.
+- **Hermite** — Fourth-order predictor-corrector integrator following the Ahmad-Cohen scheme [@makino1992hermite]. Acceleration and its time derivative (jerk) are evaluated analytically at each step, giving a third-order interpolating polynomial that is used to predict positions and velocities and then refined by a corrector pass; this costs four pairwise sweeps per step (two acceleration, two jerk) but is not symplectic. It is the standard choice in direct-summation stellar dynamics for collisional systems where close encounters make symplectic step sizes impractical.
 
 ## Post-Newtonian GR Correction
 
@@ -68,7 +70,7 @@ When a Sun–Earth–Moon system is detected among the loaded bodies, the engine
 
 # Performance
 
-Energy conservation benchmarks on a 30-day Earth–Moon simulation (fixed timestep $\Delta t = 60\,\text{s}$) show the expected hierarchy across integrators. Yoshida4 achieves roughly two orders of magnitude lower maximum relative energy drift than Leapfrog at the same timestep, consistent with the theoretical $O(\Delta t^5)$ vs $O(\Delta t^3)$ scaling. Adaptive RK45 with $\Delta t_\text{max} = 3600\,\text{s}$ achieves comparable drift to RK4 at $\Delta t = 60\,\text{s}$ while taking roughly half as many force evaluations. Comparisons against REBOUND using identical initial conditions and the IAS15 integrator [@rein2015ias15] confirm that energy drift magnitudes are within the same order across the full one-year solar system integration.
+Energy conservation benchmarks on a 30-day Earth–Moon simulation (fixed timestep $\Delta t = 60\,\text{s}$) show the expected hierarchy across integrators. Yoshida4 achieves roughly two orders of magnitude lower maximum relative energy drift than Leapfrog at the same timestep, consistent with the theoretical $O(\Delta t^5)$ vs $O(\Delta t^3)$ scaling. Adaptive RK45 with $\Delta t_\text{max} = 3600\,\text{s}$ achieves comparable drift to RK4 at $\Delta t = 60\,\text{s}$ while taking roughly half as many force evaluations. Hermite, despite its fourth-order local accuracy, shows somewhat higher maximum drift than the symplectic integrators on this short benchmark (all methods remain at or below the $10^{-12}$ level); it is not symplectic, so its long-term energy behaviour is governed by accumulated local error rather than a bounded oscillation. Comparisons against REBOUND using identical initial conditions and the IAS15 integrator [@rein2015ias15] confirm that energy drift magnitudes are within the same order across the full one-year solar system integration.
 
 ![Relative energy drift over the simulated trajectory.](results/conservation-graphs/energy_drift.png)
 
