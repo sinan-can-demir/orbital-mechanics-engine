@@ -7,6 +7,39 @@
 
 #include "cli.h"
 
+namespace
+{
+/**********************
+ * parseNumericArg
+ * @brief: Parses a numeric CLI argument, printing a clean error and exiting
+ *         instead of letting std::stoi/std::stod throw past main()'s
+ *         try/catch (which only wraps the command handlers, not parseCLI).
+ **********************/
+template <typename T, typename Converter>
+T parseNumericArg(const std::string& flag, const std::string& value, Converter convert)
+{
+    try
+    {
+        return convert(value);
+    }
+    catch (const std::exception&)
+    {
+        std::cerr << "❌ Invalid value for " << flag << ": " << value << "\n";
+        exit(1);
+    }
+}
+
+int parseIntArg(const std::string& flag, const std::string& value)
+{
+    return parseNumericArg<int>(flag, value, [](const std::string& v) { return std::stoi(v); });
+}
+
+double parseDoubleArg(const std::string& flag, const std::string& value)
+{
+    return parseNumericArg<double>(flag, value, [](const std::string& v) { return std::stod(v); });
+}
+} // namespace
+
 /**********************
  * parseCLI
  * @brief: Parses command-line arguments into a CLIOptions struct.
@@ -70,15 +103,15 @@ CLIOptions parseCLI(int argc, char** argv)
         }
         else if (a == "--steps" && i + 1 < argc)
         {
-            opt.steps = std::stoi(argv[++i]);
+            opt.steps = parseIntArg("--steps", argv[++i]);
         }
         else if (a == "--dt" && i + 1 < argc)
         {
-            opt.dt = std::stod(argv[++i]);
+            opt.dt = parseDoubleArg("--dt", argv[++i]);
         }
         else if (a == "--stride" && i + 1 < argc)
         {
-            opt.stride = std::stoi(argv[++i]);
+            opt.stride = parseIntArg("--stride", argv[++i]);
         }
         else if (a == "--output" && i + 1 < argc)
         {
