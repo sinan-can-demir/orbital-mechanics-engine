@@ -22,6 +22,14 @@ def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
 
+def test_negative_steps_raises():
+    with pytest.raises(ValueError, match='steps'):
+        orbit.simulate('systems/earth_moon.json', steps=-5, dt=60.0)
+
+def test_zero_dt_raises():
+    with pytest.raises(ValueError, match='dt'):
+        orbit.simulate('systems/earth_moon.json', steps=5, dt=0.0)
+
 def test_missing_bodies_key_raises(tmp_path):
     system_file = tmp_path / 'no_bodies.json'
     system_file.write_text(json.dumps({

@@ -12,6 +12,11 @@ namespace py = pybind11;
 SimulationResult simulate(const std::string& path, int steps, double dt,
                           Integrator integrator = Integrator::RK4, int stride = 1, bool gr = false)
 {
+    if (steps <= 0)
+        throw std::invalid_argument("steps must be a positive integer");
+    if (dt <= 0.0)
+        throw std::invalid_argument("dt must be a positive number");
+
     auto bodies = loadSystemFromJSON(path);
     return runSimulationCore(bodies, steps, dt, integrator, stride, gr);
 }
