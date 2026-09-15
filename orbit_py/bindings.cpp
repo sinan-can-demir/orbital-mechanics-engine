@@ -2,6 +2,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
+#include <stdexcept>
+
 #include "simulation.h"
 #include "json_loader.h"
 
@@ -19,6 +21,11 @@ SimulationResult simulate_adaptive(const std::string& path, double duration_s, d
                                    double rtol = 1e-9, double dt_min = 1.0, double dt_max = 86400.0,
                                    bool gr = false)
 {
+    if (dt_min <= 0.0)
+        throw std::invalid_argument("dt_min must be a positive number");
+    if (dt_min > dt_max)
+        throw std::invalid_argument("dt_min must be <= dt_max");
+
     auto bodies = loadSystemFromJSON(path);
     return runSimulationAdaptiveCore(bodies, duration_s, dt_initial, output_interval_s, atol, rtol,
                                      dt_min, dt_max, gr);
