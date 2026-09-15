@@ -424,7 +424,7 @@ ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0,
     ConservationSnapshot s;
     s.Lmag = std::sqrt(C.L[0] * C.L[0] + C.L[1] * C.L[1] + C.L[2] * C.L[2]);
     s.Pmag = std::sqrt(C.P[0] * C.P[0] + C.P[1] * C.P[1] + C.P[2] * C.P[2]);
-    s.dE = (C.total_energy - E0) / std::abs(E0);
+    s.dE = (C.total_energy - E0) / (E0 == 0.0 ? 1.0 : std::abs(E0));
     s.dL = (s.Lmag - L0) / (L0 == 0.0 ? 1.0 : L0);
     s.dP = (s.Pmag - P0) / (P0 == 0.0 ? 1.0 : P0);
     s.total_energy = C.total_energy;
