@@ -9,6 +9,7 @@
 #define ORBIT_SIM_CLI_H
 
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include "simulation.h"
@@ -31,9 +32,13 @@ struct CLIOptions
     std::string systemFile;
     std::string integrator;
 
-    int steps = -1;
-    int stride = -1;
-    double dt = -1.0;
+    // Unset (nullopt) means "not passed on the command line, use the
+    // command's default" — distinct from any value a user could actually
+    // type, so an explicit "--steps -1" is validated like any other
+    // negative value instead of colliding with the "unspecified" sentinel.
+    std::optional<int> steps;
+    std::optional<int> stride;
+    std::optional<double> dt;
 
     // fetch
     std::string fetchBody;

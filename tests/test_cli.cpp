@@ -69,6 +69,33 @@ int main()
     std::filesystem::remove("/tmp/test_cli_out.csv");
     std::filesystem::remove("/tmp/test_cli_out_conservation.csv");
 
+    // ── Test 5: explicit --steps -1 / --dt -1 are rejected, not defaulted ──
+    // Regression test: -1 used to double as the "unspecified" sentinel, so
+    // an explicit "--steps -1" silently fell back to the default instead of
+    // being validated like any other negative value.
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps -1 --dt 60 --output /tmp/test_cli_neg1.csv "
+                      "> /dev/null 2>&1");
+    if (ret == 0)
+    {
+        std::cerr << "FAIL: --steps -1 should be rejected, not silently defaulted\n";
+        return 1;
+    }
+    std::cout << "PASS: --steps -1 is rejected instead of silently defaulted\n";
+
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps 10 --dt -1 --output /tmp/test_cli_neg1.csv "
+                      "> /dev/null 2>&1");
+    if (ret == 0)
+    {
+        std::cerr << "FAIL: --dt -1 should be rejected, not silently defaulted\n";
+        return 1;
+    }
+    std::cout << "PASS: --dt -1 is rejected instead of silently defaulted\n";
+    std::filesystem::remove("/tmp/test_cli_neg1.csv");
+
     std::cout << "PASS: all CLI smoke tests passed\n";
     return 0;
 }
