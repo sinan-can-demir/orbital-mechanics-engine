@@ -1,3 +1,5 @@
+import json
+
 import orbit
 
 def test_import():
@@ -17,3 +19,15 @@ def test_energy_conservation():
 def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
+
+def test_empty_system_with_gr_does_not_crash(tmp_path):
+    # Regression test: applyGRCorrection() used to read bodies[0] out of
+    # bounds on an empty system when gr=True (undefined behavior).
+    empty_system = tmp_path / 'empty.json'
+    empty_system.write_text(json.dumps({
+        'name': 'empty',
+        'epoch': '2024-01-01 00:00:00 TDB',
+        'bodies': [],
+    }))
+    result = orbit.simulate(str(empty_system), steps=10, dt=60.0, gr=True)
+    assert result.body_names == []

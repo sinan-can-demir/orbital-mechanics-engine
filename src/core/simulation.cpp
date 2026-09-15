@@ -64,6 +64,9 @@ void computeGravitationalForce(CelestialBody& a, CelestialBody& b)
  ***********************/
 void applyGRCorrection(std::vector<CelestialBody>& bodies)
 {
+    if (bodies.empty())
+        return;
+
     // Find most massive body (Sun in solar system simulations)
     std::size_t sun_idx = 0;
     for (std::size_t k = 1; k < bodies.size(); ++k)
@@ -552,6 +555,12 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
 SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
                                    Integrator integrator, int stride, bool use_gr)
 {
+    if (bodies.empty())
+    {
+        std::cerr << "❌ No bodies to simulate.\n";
+        return {};
+    }
+
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
