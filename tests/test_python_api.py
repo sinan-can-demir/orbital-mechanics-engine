@@ -1,3 +1,5 @@
+import pytest
+
 import orbit
 
 def test_import():
@@ -17,3 +19,11 @@ def test_energy_conservation():
 def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
+
+def test_negative_steps_raises():
+    with pytest.raises(ValueError, match='steps'):
+        orbit.simulate('systems/earth_moon.json', steps=-5, dt=60.0)
+
+def test_zero_dt_raises():
+    with pytest.raises(ValueError, match='dt'):
+        orbit.simulate('systems/earth_moon.json', steps=5, dt=0.0)
