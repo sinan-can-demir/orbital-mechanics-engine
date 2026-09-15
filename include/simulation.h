@@ -162,7 +162,8 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
                         bool use_gr = false);
 
 // ── Simulation runner ─────────────────────────────────────────────────────────
-void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
+// @return false if bodies is empty (nothing to simulate), true otherwise.
+bool runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
                    const std::string& outputPath, Integrator integrator = Integrator::RK4,
                    int stride = 1, bool use_gr = false);
 

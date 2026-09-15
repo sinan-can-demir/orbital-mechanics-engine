@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 import orbit
@@ -21,6 +22,14 @@ def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
 
+def test_missing_bodies_key_raises(tmp_path):
+    system_file = tmp_path / 'no_bodies.json'
+    system_file.write_text(json.dumps({
+        'name': 'test',
+        'epoch': '2024-01-01 00:00:00 TDB',
+    }))
+    with pytest.raises(RuntimeError, match='bodies'):
+        orbit.simulate(str(system_file), steps=5, dt=60.0)
 def test_rk45_via_simulate_raises_clear_error():
     # RK45 is adaptive-step only; simulate() (fixed-step) must explain that
     # instead of raising the generic "Unknown integrator".
