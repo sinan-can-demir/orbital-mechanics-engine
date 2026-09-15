@@ -80,6 +80,27 @@ int main()
         return 1;
     }
     std::cout << "PASS: --stride 0 exits cleanly (no crash)\n";
+    // ── Test 5: malformed numeric args exit cleanly instead of crashing ────
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--dt abc > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: --dt abc should exit non-zero without a signal, got " << ret << "\n";
+        return 1;
+    }
+    std::cout << "PASS: --dt abc exits cleanly (no crash)\n";
+
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps 99999999999999999999 > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: out-of-range --steps should exit non-zero without a signal, got " << ret
+                  << "\n";
+        return 1;
+    }
+    std::cout << "PASS: out-of-range --steps exits cleanly (no crash)\n";
 
     std::cout << "PASS: all CLI smoke tests passed\n";
     return 0;
