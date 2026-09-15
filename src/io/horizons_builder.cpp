@@ -12,6 +12,10 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include <cstdlib>
+#include <unistd.h>
 
 namespace
 {
@@ -82,6 +86,34 @@ bool nextDay(const std::string& date, std::string& out)
     out = oss.str();
     return true;
 }
+
+/**********************
+ * makeSecureTempPath
+ * @brief: Atomically creates a uniquely-named, exclusively-created temp file
+ *         via mkstemp() in the system temp directory and returns its path.
+ * @note: Avoids CWE-377/CWE-59: unlike a predictable "/tmp/orb_fetch_<id>.txt"
+ *        path, mkstemp() picks a random suffix and creates the file with
+ *        O_EXCL semantics, so another local user cannot pre-plant a symlink
+ *        at the path before this process writes to it.
+ * @return: path to the created temp file, or empty string on failure
+ **********************/
+std::string makeSecureTempPath()
+{
+    std::filesystem::path templatePath =
+        std::filesystem::temp_directory_path() / "orb_fetch_XXXXXX";
+    const std::string templateStr = templatePath.string();
+    std::vector<char> buf(templateStr.begin(), templateStr.end());
+    buf.push_back('\0');
+
+    const int fd = mkstemp(buf.data());
+    if (fd == -1)
+    {
+        return "";
+    }
+    close(fd);
+
+    return std::string(buf.data());
+}
 } // namespace
 
 bool buildSystemFromHorizons(const BuildSystemOptions& opts)
@@ -136,7 +168,13 @@ bool buildSystemFromHorizons(const BuildSystemOptions& opts)
                       << " (mass lookup missing). Using mass=0.0 kg.\n";
         }
 
-        const std::string tempPath = "/tmp/orb_fetch_" + bodyId + ".txt";
+        const std::string tempPath = makeSecureTempPath();
+        if (tempPath.empty())
+        {
+            std::cerr << "❌ build-system: failed to create secure temp file for body ID " << bodyId
+                      << "\n";
+            return false;
+        }
 
         HorizonsFetchOptions hopt;
         hopt.command = bodyId;
