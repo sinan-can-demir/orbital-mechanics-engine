@@ -69,6 +69,25 @@ int main()
     std::filesystem::remove("/tmp/test_cli_out.csv");
     std::filesystem::remove("/tmp/test_cli_out_conservation.csv");
 
+    // ── Test 5: run on a system JSON missing "bodies" exits non-zero ───────
+    {
+        std::ofstream missingBodies("/tmp/test_cli_no_bodies.json");
+        missingBodies << R"({"name": "test", "epoch": "2024-01-01 00:00:00 TDB"})";
+    }
+    ret = std::system("./bin/orbit-sim run "
+                      "--system /tmp/test_cli_no_bodies.json "
+                      "--steps 5 --dt 60 "
+                      "--output /tmp/test_cli_no_bodies_out.csv "
+                      "> /dev/null 2>&1");
+    if (ret == 0)
+    {
+        std::cerr << "FAIL: run on a system missing \"bodies\" should exit non-zero\n";
+        return 1;
+    }
+    std::cout << "PASS: run on a system missing \"bodies\" exits non-zero\n";
+    std::filesystem::remove("/tmp/test_cli_no_bodies.json");
+    std::filesystem::remove("/tmp/test_cli_no_bodies_out.csv");
+
     std::cout << "PASS: all CLI smoke tests passed\n";
     return 0;
 }

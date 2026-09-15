@@ -606,13 +606,13 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
     return result;
 }
 
-void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
+bool runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
                    const std::string& outputPath, Integrator integrator, int stride, bool use_gr)
 {
     if (bodies.empty())
     {
         std::cerr << "❌ No bodies to simulate.\n";
-        return;
+        return false;
     }
 
     SimulationResult result = runSimulationCore(bodies, steps, dt, integrator, stride, use_gr);
@@ -651,6 +651,7 @@ void runSimulation(std::vector<CelestialBody>& bodies, int steps, double dt,
     }
 
     exportCSV(result, outputPath);
+    return true;
 }
 // ============================================================================
 // RK45 Dormand-Prince Adaptive Integrator
