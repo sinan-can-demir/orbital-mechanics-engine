@@ -44,7 +44,7 @@ std::vector<Frame> CSVLoader::loadOrbitCSV(const std::string& path)
     std::string line;
 
     // exportCSV() writes a "# dt=... bodies=..." metadata comment followed by
-    // the actual "step,x_Sun,..." column-name header -- skip both, not just
+    // the actual "step,x_Sun,..." column-name header — skip both, not just
     // one, or the column-header line gets misparsed as a bogus data row.
     while (std::getline(file, line))
     {
@@ -54,7 +54,7 @@ std::vector<Frame> CSVLoader::loadOrbitCSV(const std::string& path)
     }
 
     // This viewer hardcodes Sun/Earth/Moon in this order (see Frame in
-    // include/viewer/csv_loader.h) -- it cannot render an arbitrary system.
+    // include/viewer/csv_loader.h) — it cannot render an arbitrary system.
     // Without this check, pointing it at any other system's CSV would
     // silently assign the wrong body's columns to sun/earth/moon instead of
     // failing clearly.
@@ -80,6 +80,12 @@ std::vector<Frame> CSVLoader::loadOrbitCSV(const std::string& path)
         ss >> step >> comma >> f.sun.x >> comma >> f.sun.y >> comma >> f.sun.z >> comma >>
             f.earth.x >> comma >> f.earth.y >> comma >> f.earth.z >> comma >> f.moon.x >> comma >>
             f.moon.y >> comma >> f.moon.z;
+
+        if (ss.fail())
+        {
+            std::cerr << "⚠️  Skipping malformed CSV row: " << line << "\n";
+            continue;
+        }
 
         // 1) DO NOT scale — values already scaled in CSV
         f.sun *= this->scaleMeters;
