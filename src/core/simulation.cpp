@@ -912,6 +912,9 @@ RK45StepResult rk45Step(std::vector<CelestialBody>& bodies, double dt, double at
  * @param dt_min            Minimum allowed timestep
  * @param dt_max            Maximum allowed timestep
  * @param use_gr            If true, apply 1PN GR correction each step
+ * @exception std::runtime_error if the requested tolerance is unreachable
+ *            even at dt_min (steps keep rejecting with no way to shrink
+ *            dt further, which would otherwise loop forever).
  ***********************/
 SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, double duration_s,
                                            double dt_initial, double output_interval_s, double atol,
@@ -943,6 +946,12 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
     int n_steps = 0;
     int n_rejected = 0;
 
+    // Guards against an unreachable tolerance: if the step keeps getting
+    // rejected while dt is already clamped to dt_min, the state and dt never
+    // change, so the loop would otherwise retry the exact same step forever.
+    constexpr int kMaxConsecutiveRejectionsAtDtMin = 50;
+    int consecutive_rejections_at_dt_min = 0;
+
     // FSAL: reuse k7 from each accepted step as k1 of the next
     std::vector<StateDerivative> fsal_k1;
     bool has_fsal = false;
@@ -960,6 +969,7 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
             ++n_steps;
             fsal_k1 = std::move(step.k7);
             has_fsal = true;
+            consecutive_rejections_at_dt_min = 0;
 
             if (t >= next_output)
             {
@@ -979,6 +989,20 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
         {
             ++n_rejected;
             has_fsal = false; // rejected step: k7 was at unaccepted y5, must recompute k1
+
+            if (dt <= dt_min)
+            {
+                ++consecutive_rejections_at_dt_min;
+                if (consecutive_rejections_at_dt_min >= kMaxConsecutiveRejectionsAtDtMin)
+                    throw std::runtime_error("RK45: tolerance unreachable at dt_min (rejected " +
+                                             std::to_string(consecutive_rejections_at_dt_min) +
+                                             " consecutive steps at dt=" + std::to_string(dt_min) +
+                                             "); loosen atol/rtol or lower dt_min");
+            }
+            else
+            {
+                consecutive_rejections_at_dt_min = 0;
+            }
         }
 
         dt = std::clamp(step.dt_next, dt_min, dt_max);
