@@ -230,19 +230,19 @@ int main(int argc, char** argv)
             try
             {
                 auto bodies = loadSystemFromJSON(opt.output);
-                int steps = (opt.steps == -1 ? 8766 : opt.steps);
+                int steps = opt.steps.value_or(8766);
                 if (steps <= 0)
                 {
                     std::cerr << "❌ --steps must be a positive integer\n";
                     return 1;
                 }
-                double dt = (opt.dt == -1.0 ? 3600.0 : opt.dt);
+                double dt = opt.dt.value_or(3600.0);
                 if (dt <= 0.0)
                 {
                     std::cerr << "❌ --dt must be a positive number\n";
                     return 1;
                 }
-                int stride = (opt.stride == -1 ? 1 : opt.stride);
+                int stride = opt.stride.value_or(1);
                 const std::string runOut = opt.output + ".csv";
 
                 std::cout << "Running simulation after build:\n"
@@ -252,7 +252,10 @@ int main(int argc, char** argv)
                           << " - Stride:     " << stride << "\n"
                           << " - Output:     " << runOut << "\n";
 
-                runSimulation(bodies, steps, dt, runOut, Integrator::RK4, stride);
+                if (!runSimulation(bodies, steps, dt, runOut, Integrator::RK4, stride))
+                {
+                    return 1;
+                }
             }
             catch (const std::exception& e)
             {
@@ -287,26 +290,26 @@ int main(int argc, char** argv)
 
             // Determine simulation parameters
             int steps;
-            if (opt.steps == -1)
+            if (!opt.steps.has_value())
                 steps = 8766;
-            else if (opt.steps <= 0)
+            else if (*opt.steps <= 0)
             {
                 std::cerr << "❌ --steps must be a positive integer\n";
                 return 1;
             }
             else
-                steps = opt.steps;
+                steps = *opt.steps;
 
             double dt;
-            if (opt.dt == -1.0)
+            if (!opt.dt.has_value())
                 dt = 3600.0;
-            else if (opt.dt <= 0.0)
+            else if (*opt.dt <= 0.0)
             {
                 std::cerr << "❌ --dt must be a positive number\n";
                 return 1;
             }
             else
-                dt = opt.dt;
+                dt = *opt.dt;
 
             // Default output path
             std::string outPath = opt.output.empty() ? "build/orbit_three_body.csv" : opt.output;
@@ -327,7 +330,12 @@ int main(int argc, char** argv)
             }
 
             // In the run block, alongside steps and dt:
-            int stride = (opt.stride == -1 ? 1 : opt.stride);
+            int stride = opt.stride.value_or(1);
+            if (stride < 1)
+            {
+                std::cerr << "❌ --stride must be a positive integer\n";
+                return 1;
+            }
 
             std::cout << "Running simulation:\n"
                       << " - System:     " << opt.systemFile << "\n"
@@ -344,7 +352,10 @@ int main(int argc, char** argv)
                       << " - GR corr.:   " << (opt.use_gr ? "enabled (1PN Schwarzschild)" : "off")
                       << "\n";
 
-            runSimulation(bodies, steps, dt, outPath, integrator, stride, opt.use_gr);
+            if (!runSimulation(bodies, steps, dt, outPath, integrator, stride, opt.use_gr))
+            {
+                return 1;
+            }
         }
         catch (const std::exception& e)
         {
