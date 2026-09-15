@@ -318,6 +318,11 @@ int main(int argc, char** argv)
 
             // In the run block, alongside steps and dt:
             int stride = (opt.stride == -1 ? 1 : opt.stride);
+            if (stride < 1)
+            {
+                std::cerr << "❌ --stride must be a positive integer\n";
+                return 1;
+            }
 
             std::cout << "Running simulation:\n"
                       << " - System:     " << opt.systemFile << "\n"
