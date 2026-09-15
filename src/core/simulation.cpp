@@ -546,12 +546,15 @@ void exportCSV(const SimulationResult& result, const std::string& outputPath)
  * @param integrator  - integration method to use (default: RK4)
  * @param stride     - record every Nth step
  * @param use_gr     - if true, apply 1PN GR correction each step
- * @exception none
+ * @exception std::invalid_argument if stride < 1
  * @return SimulationResult
  *********************/
 SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps, double dt,
                                    Integrator integrator, int stride, bool use_gr)
 {
+    if (stride < 1)
+        throw std::invalid_argument("runSimulationCore: stride must be >= 1");
+
     physics::Conservations C0 = physics::compute(bodies);
     double E0 = C0.total_energy;
     double L0 = std::sqrt(C0.L[0] * C0.L[0] + C0.L[1] * C0.L[1] + C0.L[2] * C0.L[2]);
