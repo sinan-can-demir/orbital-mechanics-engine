@@ -10,6 +10,26 @@
 // Moon orbit exaggeration factor (for visibility)
 static constexpr float MOON_EXAGGERATION = 15.0f;
 
+namespace
+{
+// The only system this viewer knows how to render: 3 bodies in this exact
+// order, matching exportCSV()'s "step,x_<name>,y_<name>,z_<name>,..." header.
+const std::vector<std::string> kExpectedHeader = {
+    "step",    "x_Sun",   "y_Sun",  "z_Sun",  "x_Earth",
+    "y_Earth", "z_Earth", "x_Moon", "y_Moon", "z_Moon",
+};
+
+std::vector<std::string> splitCSVHeader(const std::string& line)
+{
+    std::vector<std::string> fields;
+    std::stringstream ss(line);
+    std::string field;
+    while (std::getline(ss, field, ','))
+        fields.push_back(field);
+    return fields;
+}
+} // namespace
+
 std::vector<Frame> CSVLoader::loadOrbitCSV(const std::string& path)
 {
     std::vector<Frame> frames;
@@ -22,7 +42,30 @@ std::vector<Frame> CSVLoader::loadOrbitCSV(const std::string& path)
     }
 
     std::string line;
-    std::getline(file, line); // header
+
+    // exportCSV() writes a "# dt=... bodies=..." metadata comment followed by
+    // the actual "step,x_Sun,..." column-name header -- skip both, not just
+    // one, or the column-header line gets misparsed as a bogus data row.
+    while (std::getline(file, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue;
+        break; // `line` now holds the column-name header
+    }
+
+    // This viewer hardcodes Sun/Earth/Moon in this order (see Frame in
+    // include/viewer/csv_loader.h) -- it cannot render an arbitrary system.
+    // Without this check, pointing it at any other system's CSV would
+    // silently assign the wrong body's columns to sun/earth/moon instead of
+    // failing clearly.
+    if (splitCSVHeader(line) != kExpectedHeader)
+    {
+        std::cerr << "❌ Unsupported CSV column layout in: " << path << "\n"
+                  << "   This viewer only supports 3-body Sun/Earth/Moon systems "
+                     "(expected header: step,x_Sun,y_Sun,z_Sun,x_Earth,y_Earth,z_Earth,x_Moon,y_"
+                     "Moon,z_Moon)\n";
+        return frames;
+    }
 
     while (std::getline(file, line))
     {
