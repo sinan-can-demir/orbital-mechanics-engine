@@ -3,6 +3,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <sys/wait.h>
 
 int main()
 {
@@ -68,6 +69,56 @@ int main()
 
     std::filesystem::remove("/tmp/test_cli_out.csv");
     std::filesystem::remove("/tmp/test_cli_out_conservation.csv");
+
+    // ── Test 5: run on a system JSON missing "bodies" exits non-zero ───────
+    {
+        std::ofstream missingBodies("/tmp/test_cli_no_bodies.json");
+        missingBodies << R"({"name": "test", "epoch": "2024-01-01 00:00:00 TDB"})";
+    }
+    ret = std::system("./bin/orbit-sim run "
+                      "--system /tmp/test_cli_no_bodies.json "
+                      "--steps 5 --dt 60 "
+                      "--output /tmp/test_cli_no_bodies_out.csv "
+                      "> /dev/null 2>&1");
+    if (ret == 0)
+    {
+        std::cerr << "FAIL: run on a system missing \"bodies\" should exit non-zero\n";
+        return 1;
+    }
+    std::cout << "PASS: run on a system missing \"bodies\" exits non-zero\n";
+    std::filesystem::remove("/tmp/test_cli_no_bodies.json");
+    std::filesystem::remove("/tmp/test_cli_no_bodies_out.csv");
+    // ── Test 5: --stride 0 exits cleanly instead of SIGFPE ─────────────────
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps 10 --dt 60 --stride 0 > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: --stride 0 should exit non-zero without a signal, got " << ret << "\n";
+        return 1;
+    }
+    std::cout << "PASS: --stride 0 exits cleanly (no crash)\n";
+    // ── Test 5: malformed numeric args exit cleanly instead of crashing ────
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--dt abc > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: --dt abc should exit non-zero without a signal, got " << ret << "\n";
+        return 1;
+    }
+    std::cout << "PASS: --dt abc exits cleanly (no crash)\n";
+
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps 99999999999999999999 > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: out-of-range --steps should exit non-zero without a signal, got " << ret
+                  << "\n";
+        return 1;
+    }
+    std::cout << "PASS: out-of-range --steps exits cleanly (no crash)\n";
 
     std::cout << "PASS: all CLI smoke tests passed\n";
     return 0;
