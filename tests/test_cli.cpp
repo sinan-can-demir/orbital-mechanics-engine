@@ -70,6 +70,16 @@ int main()
     std::filesystem::remove("/tmp/test_cli_out.csv");
     std::filesystem::remove("/tmp/test_cli_out_conservation.csv");
 
+    // ── Test 5: --stride 0 exits cleanly instead of SIGFPE ─────────────────
+    ret = std::system("./bin/orbit-sim run "
+                      "--system ../systems/earth_moon.json "
+                      "--steps 10 --dt 60 --stride 0 > /dev/null 2>&1");
+    if (ret == 0 || WIFSIGNALED(ret))
+    {
+        std::cerr << "FAIL: --stride 0 should exit non-zero without a signal, got " << ret << "\n";
+        return 1;
+    }
+    std::cout << "PASS: --stride 0 exits cleanly (no crash)\n";
     // ── Test 5: malformed numeric args exit cleanly instead of crashing ────
     ret = std::system("./bin/orbit-sim run "
                       "--system ../systems/earth_moon.json "
