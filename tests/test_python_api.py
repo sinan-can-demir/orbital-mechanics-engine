@@ -21,6 +21,17 @@ def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
 
+def test_rk45_via_simulate_raises_clear_error():
+    # RK45 is adaptive-step only; simulate() (fixed-step) must explain that
+    # instead of raising the generic "Unknown integrator".
+    with pytest.raises(ValueError, match="simulate_adaptive"):
+        orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0,
+                        integrator=orbit.Integrator.RK45)
+
+def test_euler_not_exposed():
+    # eulerStep() has no working dispatcher entry point, so it must not be
+    # exposed as a selectable Integrator value.
+    assert not hasattr(orbit.Integrator, 'Euler')
 def test_empty_system_with_gr_does_not_crash(tmp_path):
     # Regression test: applyGRCorrection() used to read bodies[0] out of
     # bounds on an empty system when gr=True (undefined behavior).
