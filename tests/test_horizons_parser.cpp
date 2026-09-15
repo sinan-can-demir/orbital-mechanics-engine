@@ -55,5 +55,31 @@ int main()
     std::filesystem::remove(path);
 
     std::cout << "PASS: HORIZONS parser parsed first epoch and converted SI units\n";
+
+    // Regression test: parseTripleAfterEquals() used to assign fields purely
+    // by position (1st "=", 2nd "=", 3rd "="), ignoring the label text before
+    // each "=". A line with reordered labels (Z, X, Y) must now be rejected
+    // rather than silently mislabeled.
+    const std::string reorderedPath = "build/test_horizons_parser_reordered.txt";
+    std::ofstream reordered(reorderedPath);
+    reordered << "Header\n";
+    reordered << "$$SOE\n";
+    reordered << "2460676.500000000 = A.D. 2025-Jan-01 00:00:00.0000 TDB\n";
+    reordered << " Z =2.000000000000E+01 X =1.000000000000E+01 Y =3.000000000000E+01\n";
+    reordered << " VX=0.000000000000E+00 VY=0.000000000000E+00 VZ=0.000000000000E+00\n";
+    reordered << "$$EOE\n";
+    reordered.close();
+
+    HorizonsState reorderedState;
+    const bool reorderedOk = parseHorizonsVectors(reorderedPath, reorderedState);
+    std::filesystem::remove(reorderedPath);
+
+    if (reorderedOk)
+    {
+        std::cerr << "FAIL: parser accepted a line with reordered X/Y/Z labels\n";
+        return 1;
+    }
+
+    std::cout << "PASS: parser rejects reordered X/Y/Z labels instead of silently mislabeling\n";
     return 0;
 }

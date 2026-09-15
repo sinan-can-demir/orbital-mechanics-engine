@@ -65,11 +65,13 @@ PYBIND11_MODULE(orbit, m)
     m.doc() = "Orbital Mechanics Engine — Python bindings";
     m.attr("__version__") = "2.0.0";
 
+    // Note: Euler is intentionally not exposed here — eulerStep() exists in
+    // simulation.cpp but is never wired into any dispatcher, so there is no
+    // working code path that could ever handle Integrator.Euler.
     py::enum_<Integrator>(m, "Integrator")
         .value("RK4", Integrator::RK4)
         .value("Leapfrog", Integrator::Leapfrog)
         .value("RK45", Integrator::RK45)
-        .value("Euler", Integrator::euler)
         .value("Yoshida4", Integrator::Yoshida4)
         .value("Hermite", Integrator::Hermite)
         .export_values();
