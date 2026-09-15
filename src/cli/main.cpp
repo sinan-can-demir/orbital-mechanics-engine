@@ -231,7 +231,17 @@ int main(int argc, char** argv)
             {
                 auto bodies = loadSystemFromJSON(opt.output);
                 int steps = opt.steps.value_or(8766);
+                if (steps <= 0)
+                {
+                    std::cerr << "❌ --steps must be a positive integer\n";
+                    return 1;
+                }
                 double dt = opt.dt.value_or(3600.0);
+                if (dt <= 0.0)
+                {
+                    std::cerr << "❌ --dt must be a positive number\n";
+                    return 1;
+                }
                 int stride = opt.stride.value_or(1);
                 const std::string runOut = opt.output + ".csv";
 
