@@ -583,6 +583,10 @@ SimulationResult runSimulationCore(std::vector<CelestialBody>& bodies, int steps
         stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { hermiteStep(b, d, use_gr); };
     else if (integrator == Integrator::RK4)
         stepFn = [use_gr](std::vector<CelestialBody>& b, double d) { rk4Step(b, d, use_gr); };
+    else if (integrator == Integrator::RK45)
+        throw std::invalid_argument(
+            "RK45 is an adaptive-step integrator and is not usable with the fixed-step "
+            "simulate()/runSimulationCore() API — use simulate_adaptive() instead");
     else
         throw std::invalid_argument("Unknown integrator");
 
