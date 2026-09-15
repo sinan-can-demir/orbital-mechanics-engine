@@ -242,7 +242,10 @@ int main(int argc, char** argv)
                           << " - Stride:     " << stride << "\n"
                           << " - Output:     " << runOut << "\n";
 
-                runSimulation(bodies, steps, dt, runOut, Integrator::RK4, stride);
+                if (!runSimulation(bodies, steps, dt, runOut, Integrator::RK4, stride))
+                {
+                    return 1;
+                }
             }
             catch (const std::exception& e)
             {
@@ -318,6 +321,11 @@ int main(int argc, char** argv)
 
             // In the run block, alongside steps and dt:
             int stride = opt.stride.value_or(1);
+            if (stride < 1)
+            {
+                std::cerr << "❌ --stride must be a positive integer\n";
+                return 1;
+            }
 
             std::cout << "Running simulation:\n"
                       << " - System:     " << opt.systemFile << "\n"
@@ -334,7 +342,10 @@ int main(int argc, char** argv)
                       << " - GR corr.:   " << (opt.use_gr ? "enabled (1PN Schwarzschild)" : "off")
                       << "\n";
 
-            runSimulation(bodies, steps, dt, outPath, integrator, stride, opt.use_gr);
+            if (!runSimulation(bodies, steps, dt, outPath, integrator, stride, opt.use_gr))
+            {
+                return 1;
+            }
         }
         catch (const std::exception& e)
         {

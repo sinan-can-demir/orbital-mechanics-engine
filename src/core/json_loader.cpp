@@ -33,6 +33,11 @@ std::vector<CelestialBody> loadSystemFromJSON(const std::string& path)
     json j;
     file >> j;
 
+    if (!j.contains("bodies"))
+    {
+        throw std::runtime_error("system JSON missing required \"bodies\" array: " + path);
+    }
+
     std::vector<CelestialBody> bodies;
 
     for (const auto& b : j["bodies"])

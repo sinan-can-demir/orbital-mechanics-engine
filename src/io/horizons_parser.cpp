@@ -1,5 +1,6 @@
 #include "horizons_parser.h"
 
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -7,7 +8,30 @@
 
 namespace
 {
-bool parseTripleAfterEquals(const std::string& line, double& a, double& b, double& c)
+// Extracts the whitespace-delimited token immediately preceding position
+// `eqPos` in `line` (i.e. the field label just before its '=' sign), e.g.
+// for " X =1.0" and eqPos pointing at '=', returns "X".
+std::string labelBeforeEquals(const std::string& line, size_t eqPos)
+{
+    size_t end = eqPos;
+    while (end > 0 && std::isspace(static_cast<unsigned char>(line[end - 1])))
+        --end;
+
+    size_t begin = end;
+    while (begin > 0 && !std::isspace(static_cast<unsigned char>(line[begin - 1])))
+        --begin;
+
+    return line.substr(begin, end - begin);
+}
+
+// Parses three "LABEL =value" fields from `line`, validating that the field
+// labels match expLabelA/B/C in order (e.g. "X","Y","Z"), not just their
+// position. HORIZONS always emits fields in a fixed order today, but nothing
+// enforced that assumption before — a reordered/malformed line used to be
+// silently accepted and its values assigned positionally.
+bool parseTripleAfterEquals(const std::string& line, const std::string& expLabelA,
+                            const std::string& expLabelB, const std::string& expLabelC, double& a,
+                            double& b, double& c)
 {
     const size_t eq1 = line.find('=');
     if (eq1 == std::string::npos)
@@ -23,6 +47,12 @@ bool parseTripleAfterEquals(const std::string& line, double& a, double& b, doubl
 
     const size_t eq3 = line.find('=', eq2 + 1);
     if (eq3 == std::string::npos)
+    {
+        return false;
+    }
+
+    if (labelBeforeEquals(line, eq1) != expLabelA || labelBeforeEquals(line, eq2) != expLabelB ||
+        labelBeforeEquals(line, eq3) != expLabelC)
     {
         return false;
     }
@@ -83,15 +113,17 @@ bool parseHorizonsVectors(const std::string& path, HorizonsState& state)
     double rawX = 0.0, rawY = 0.0, rawZ = 0.0;
     double rawVx = 0.0, rawVy = 0.0, rawVz = 0.0;
 
-    if (!parseTripleAfterEquals(xyzLine, rawX, rawY, rawZ))
+    if (!parseTripleAfterEquals(xyzLine, "X", "Y", "Z", rawX, rawY, rawZ))
     {
-        std::cerr << "❌ parseHorizonsVectors: malformed XYZ line in: " << path << "\n";
+        std::cerr << "❌ parseHorizonsVectors: malformed or mislabeled XYZ line in: " << path
+                  << "\n";
         return false;
     }
 
-    if (!parseTripleAfterEquals(vxyzLine, rawVx, rawVy, rawVz))
+    if (!parseTripleAfterEquals(vxyzLine, "VX", "VY", "VZ", rawVx, rawVy, rawVz))
     {
-        std::cerr << "❌ parseHorizonsVectors: malformed VXYZ line in: " << path << "\n";
+        std::cerr << "❌ parseHorizonsVectors: malformed or mislabeled VXYZ line in: " << path
+                  << "\n";
         return false;
     }
 
