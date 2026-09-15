@@ -22,6 +22,14 @@ def test_body_names():
     result = orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0)
     assert result.body_names == ['Sun', 'Earth', 'Moon']
 
+def test_negative_steps_raises():
+    with pytest.raises(ValueError, match='steps'):
+        orbit.simulate('systems/earth_moon.json', steps=-5, dt=60.0)
+
+def test_zero_dt_raises():
+    with pytest.raises(ValueError, match='dt'):
+        orbit.simulate('systems/earth_moon.json', steps=5, dt=0.0)
+
 def test_missing_bodies_key_raises(tmp_path):
     system_file = tmp_path / 'no_bodies.json'
     system_file.write_text(json.dumps({
@@ -30,6 +38,7 @@ def test_missing_bodies_key_raises(tmp_path):
     }))
     with pytest.raises(RuntimeError, match='bodies'):
         orbit.simulate(str(system_file), steps=5, dt=60.0)
+
 def test_rk45_via_simulate_raises_clear_error():
     # RK45 is adaptive-step only; simulate() (fixed-step) must explain that
     # instead of raising the generic "Unknown integrator".
@@ -41,6 +50,7 @@ def test_euler_not_exposed():
     # eulerStep() has no working dispatcher entry point, so it must not be
     # exposed as a selectable Integrator value.
     assert not hasattr(orbit.Integrator, 'Euler')
+
 def test_empty_system_with_gr_does_not_crash(tmp_path):
     # Regression test: applyGRCorrection() used to read bodies[0] out of
     # bounds on an empty system when gr=True (undefined behavior).
@@ -52,6 +62,7 @@ def test_empty_system_with_gr_does_not_crash(tmp_path):
     }))
     result = orbit.simulate(str(empty_system), steps=10, dt=60.0, gr=True)
     assert result.body_names == []
+
 def test_adaptive_unreachable_tolerance_raises_instead_of_hanging():
     # atol/rtol far tighter than achievable at dt_min=dt_max=1.0s: every step
     # rejects and dt can never shrink further, so this must raise quickly
@@ -59,6 +70,7 @@ def test_adaptive_unreachable_tolerance_raises_instead_of_hanging():
     with pytest.raises(RuntimeError):
         orbit.simulate_adaptive('systems/earth_moon.json', duration_s=3600.0, dt_initial=1.0,
                                  atol=1e-300, rtol=1e-300, dt_min=1.0, dt_max=1.0)
+
 def test_stride_zero_raises_instead_of_crashing():
     with pytest.raises(ValueError):
         orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0, stride=0)
