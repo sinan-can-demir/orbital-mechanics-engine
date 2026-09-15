@@ -74,3 +74,13 @@ def test_adaptive_unreachable_tolerance_raises_instead_of_hanging():
 def test_stride_zero_raises_instead_of_crashing():
     with pytest.raises(ValueError):
         orbit.simulate('systems/earth_moon.json', steps=10, dt=60.0, stride=0)
+
+def test_simulate_adaptive_rejects_dt_min_greater_than_dt_max():
+    with pytest.raises(ValueError, match='dt_min'):
+        orbit.simulate_adaptive('systems/earth_moon.json', duration_s=3600.0,
+                                 dt_initial=100.0, dt_min=1000.0, dt_max=1.0)
+
+def test_simulate_adaptive_rejects_non_positive_dt_min():
+    with pytest.raises(ValueError, match='dt_min'):
+        orbit.simulate_adaptive('systems/earth_moon.json', duration_s=3600.0,
+                                 dt_initial=100.0, dt_min=0.0, dt_max=100.0)
