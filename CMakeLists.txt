@@ -72,6 +72,18 @@ if (BUILD_VULKAN_VIEWER)
     # vulkan-validation-layers packages, so a plain find_program() is enough
     # rather than a whole FetchContent.
     find_program(GLSLC_EXECUTABLE glslc REQUIRED)
+
+    # VMA (Vulkan Memory Allocator) — handles GPU memory-type selection and
+    # suballocation so we don't hand-roll a bump allocator on top of raw
+    # vkAllocateMemory. It's a header-only library; the actual implementation
+    # is compiled into one .cpp (src/viewer_vk/vma_impl.cpp) via the
+    # VMA_IMPLEMENTATION macro, same pattern as stb_image.h-style libraries.
+    FetchContent_Declare(
+        VulkanMemoryAllocator
+        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+        GIT_TAG        v3.1.0
+    )
+    FetchContent_MakeAvailable(VulkanMemoryAllocator)
 endif()
 
 # ------------------------------------------------------------
@@ -164,8 +176,8 @@ set(ORBIT_VK_SPV_DIR ${CMAKE_BINARY_DIR}/shaders)
 file(MAKE_DIRECTORY ${ORBIT_VK_SPV_DIR})
 
 set(ORBIT_VK_SHADER_SOURCES
-    ${ORBIT_VK_SHADER_DIR}/triangle.vert
-    ${ORBIT_VK_SHADER_DIR}/triangle.frag
+    ${ORBIT_VK_SHADER_DIR}/sphere.vert
+    ${ORBIT_VK_SHADER_DIR}/sphere.frag
 )
 set(ORBIT_VK_SHADER_SPVS "")
 foreach(shader_src ${ORBIT_VK_SHADER_SOURCES})
@@ -185,6 +197,7 @@ add_custom_target(orbit-viewer-vk-shaders DEPENDS ${ORBIT_VK_SHADER_SPVS})
 
 add_executable(orbit-viewer-vk
     src/viewer_vk/main.cpp
+    src/viewer_vk/vma_impl.cpp
 )
 add_dependencies(orbit-viewer-vk orbit-viewer-vk-shaders)
 
@@ -195,6 +208,7 @@ target_include_directories(orbit-viewer-vk PRIVATE
 target_link_libraries(orbit-viewer-vk PRIVATE
     Vulkan::Vulkan
     vk-bootstrap::vk-bootstrap
+    GPUOpen::VulkanMemoryAllocator
     glfw
     glm::glm
 )
