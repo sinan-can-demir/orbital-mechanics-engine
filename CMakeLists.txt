@@ -66,6 +66,12 @@ if (BUILD_VULKAN_VIEWER)
         GIT_TAG        v1.3.302
     )
     FetchContent_MakeAvailable(vk-bootstrap)
+
+    # glslc compiles GLSL source to SPIR-V bytecode, the format Vulkan
+    # actually consumes at runtime. Ships with the Vulkan SDK / distro
+    # vulkan-validation-layers packages, so a plain find_program() is enough
+    # rather than a whole FetchContent.
+    find_program(GLSLC_EXECUTABLE glslc REQUIRED)
 endif()
 
 # ------------------------------------------------------------
@@ -148,9 +154,39 @@ endif()  # BUILD_VIEWER
 # ------------------------------------------------------------
 if (BUILD_VULKAN_VIEWER)
 
+# Compile each GLSL shader to SPIR-V at build time. Each add_custom_command()
+# declares a real dependency edge (glslc only reruns when the .vert/.frag
+# source is newer than the .spv it produced last time) — this is what
+# "wired into the build" means, versus a README note saying "remember to run
+# glslc by hand."
+set(ORBIT_VK_SHADER_DIR ${PROJECT_SOURCE_DIR}/src/viewer_vk/shaders)
+set(ORBIT_VK_SPV_DIR ${CMAKE_BINARY_DIR}/shaders)
+file(MAKE_DIRECTORY ${ORBIT_VK_SPV_DIR})
+
+set(ORBIT_VK_SHADER_SOURCES
+    ${ORBIT_VK_SHADER_DIR}/triangle.vert
+    ${ORBIT_VK_SHADER_DIR}/triangle.frag
+)
+set(ORBIT_VK_SHADER_SPVS "")
+foreach(shader_src ${ORBIT_VK_SHADER_SOURCES})
+    get_filename_component(shader_name ${shader_src} NAME)
+    set(shader_spv ${ORBIT_VK_SPV_DIR}/${shader_name}.spv)
+    add_custom_command(
+        OUTPUT ${shader_spv}
+        COMMAND ${GLSLC_EXECUTABLE} ${shader_src} -o ${shader_spv}
+        DEPENDS ${shader_src}
+        COMMENT "Compiling shader ${shader_name} -> SPIR-V"
+        VERBATIM
+    )
+    list(APPEND ORBIT_VK_SHADER_SPVS ${shader_spv})
+endforeach()
+
+add_custom_target(orbit-viewer-vk-shaders DEPENDS ${ORBIT_VK_SHADER_SPVS})
+
 add_executable(orbit-viewer-vk
     src/viewer_vk/main.cpp
 )
+add_dependencies(orbit-viewer-vk orbit-viewer-vk-shaders)
 
 target_include_directories(orbit-viewer-vk PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -166,6 +202,10 @@ target_link_libraries(orbit-viewer-vk PRIVATE
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
     target_compile_definitions(orbit-viewer-vk PRIVATE ORBIT_VK_VALIDATION_LAYERS=1)
 endif()
+
+target_compile_definitions(orbit-viewer-vk PRIVATE
+    ORBIT_VK_SHADER_DIR="${ORBIT_VK_SPV_DIR}"
+)
 
 endif()  # BUILD_VULKAN_VIEWER
 
