@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Option to enable / disable viewer (ON locally, OFF in CI)
 option(BUILD_VIEWER "Build OpenGL viewer (requires OpenGL, GLFW, GLM)" ON)
+option(BUILD_VULKAN_VIEWER "Build Vulkan viewer (requires Vulkan SDK, GLFW, GLM)" ON)
 
 # Put all executables in build/bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -42,6 +43,29 @@ if (BUILD_VIEWER)
         message(WARNING "OpenGL, GLFW3, or GLM not found. Disabling viewer.")
         set(BUILD_VIEWER OFF CACHE BOOL "Build OpenGL viewer" FORCE)
     endif()
+endif()
+
+# Vulkan viewer dependencies (independent of the OpenGL viewer — GLFW/GLM are
+# backend-agnostic and shared, but this does its own find_package() calls so
+# BUILD_VIEWER=OFF doesn't drag BUILD_VULKAN_VIEWER down with it).
+if (BUILD_VULKAN_VIEWER)
+    find_package(Vulkan)
+    find_package(glfw3)
+    find_package(glm)
+
+    if (NOT Vulkan_FOUND OR NOT glfw3_FOUND OR NOT glm_FOUND)
+        message(WARNING "Vulkan SDK, GLFW3, or GLM not found. Disabling Vulkan viewer.")
+        set(BUILD_VULKAN_VIEWER OFF CACHE BOOL "Build Vulkan viewer" FORCE)
+    endif()
+endif()
+
+if (BUILD_VULKAN_VIEWER)
+    FetchContent_Declare(
+        vk-bootstrap
+        GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap.git
+        GIT_TAG        v1.3.302
+    )
+    FetchContent_MakeAvailable(vk-bootstrap)
 endif()
 
 # ------------------------------------------------------------
@@ -118,6 +142,32 @@ target_include_directories(test_csv_loader PRIVATE ${PROJECT_SOURCE_DIR}/include
 target_link_libraries(test_csv_loader PRIVATE glm::glm)
 
 endif()  # BUILD_VIEWER
+
+# ------------------------------------------------------------
+# orbit-viewer-vk (Vulkan renderer) — OPTIONAL, learning-exercise rewrite
+# ------------------------------------------------------------
+if (BUILD_VULKAN_VIEWER)
+
+add_executable(orbit-viewer-vk
+    src/viewer_vk/main.cpp
+)
+
+target_include_directories(orbit-viewer-vk PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(orbit-viewer-vk PRIVATE
+    Vulkan::Vulkan
+    vk-bootstrap::vk-bootstrap
+    glfw
+    glm::glm
+)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
+    target_compile_definitions(orbit-viewer-vk PRIVATE ORBIT_VK_VALIDATION_LAYERS=1)
+endif()
+
+endif()  # BUILD_VULKAN_VIEWER
 
 # ------------------------------------------------------------
 # orbit-sim (CLI executable)
