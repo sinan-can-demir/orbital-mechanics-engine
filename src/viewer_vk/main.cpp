@@ -1,23 +1,33 @@
-// orbit-viewer-vk — Vulkan #70 "Boot" + #71 "First pipeline + triangle".
+// orbit-viewer-vk — Vulkan #70 "Boot" + #71 "First pipeline + triangle" +
+// #72 "Sphere mesh: vertex/index buffers via VMA, MVP uniforms".
 //
 // #70 opened a window and cleared it to a solid color every frame, with a
-// swapchain that survives resize, and clean shutdown. #71 adds the graphics
-// pipeline object and renders a single hardcoded triangle with per-vertex
-// colors (src/viewer_vk/shaders/triangle.{vert,frag}), interpolated across
-// its face by the rasterizer.
+// swapchain that survives resize, and clean shutdown. #71 added the graphics
+// pipeline object and rendered a single hardcoded triangle. #72 replaces
+// that triangle with a real UV-sphere mesh: vertex/index data uploaded to
+// device-local GPU memory via VMA (through a staging-buffer copy), and an
+// MVP matrix pushed to the vertex shader every frame via push constants
+// (src/viewer_vk/shaders/sphere.{vert,frag}).
 //
 // Compared to the OpenGL viewer, nothing here is implicit. OpenGL hides a
 // global state machine behind you; every object below (instance, device,
-// swapchain, render pass, pipeline, framebuffers, command buffers, sync
-// objects) is something *you* create, configure, and destroy by hand, in a
-// specific order. That's the whole point of the exercise.
+// swapchain, render pass, pipeline, buffers, framebuffers, command buffers,
+// sync objects) is something *you* create, configure, and destroy by hand,
+// in a specific order. That's the whole point of the exercise.
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
+#include <vk_mem_alloc.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -29,6 +39,93 @@ namespace
 constexpr uint32_t kInitialWidth = 1280;
 constexpr uint32_t kInitialHeight = 720;
 constexpr int kMaxFramesInFlight = 2;
+
+constexpr float kSphereRadius = 1.0f;
+constexpr int kSphereSegments = 32;
+constexpr int kSphereRings = 16;
+
+// Position + normal, read from a real vertex buffer this milestone instead
+// of being hardcoded inside the shader (see #71's triangle for the
+// hardcoded version this replaces).
+struct Vertex
+{
+    glm::vec3 pos;
+    glm::vec3 normal;
+
+    static VkVertexInputBindingDescription getBindingDescription()
+    {
+        VkVertexInputBindingDescription binding{};
+        binding.binding = 0;
+        binding.stride = sizeof(Vertex);
+        binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return binding;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+    {
+        std::array<VkVertexInputAttributeDescription, 2> attrs{};
+        attrs[0].binding = 0;
+        attrs[0].location = 0;
+        attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attrs[0].offset = offsetof(Vertex, pos);
+
+        attrs[1].binding = 0;
+        attrs[1].location = 1;
+        attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attrs[1].offset = offsetof(Vertex, normal);
+        return attrs;
+    }
+};
+
+struct PushConstants
+{
+    glm::mat4 mvp;
+};
+
+// Backend-agnostic UV-sphere geometry generation, lifted out of the
+// OpenGL-only SphereMesh::build() (src/viewer/sphere_mesh.cpp), which is
+// tied to GLuint VAO/VBO/EBO handles and can't be reused directly from
+// Vulkan. See GitHub issue #78 for the follow-up to de-duplicate this
+// against the OpenGL viewer properly.
+void generateSphereMesh(float radius, int segments, int rings, std::vector<Vertex>& vertices,
+                        std::vector<uint32_t>& indices)
+{
+    for (int y = 0; y <= rings; ++y)
+    {
+        float v = static_cast<float>(y) / static_cast<float>(rings);
+        float phi = v * static_cast<float>(M_PI);
+
+        for (int x = 0; x <= segments; ++x)
+        {
+            float u = static_cast<float>(x) / static_cast<float>(segments);
+            float theta = u * 2.0f * static_cast<float>(M_PI);
+
+            glm::vec3 pos(radius * std::sin(phi) * std::cos(theta), radius * std::cos(phi),
+                          radius * std::sin(phi) * std::sin(theta));
+            glm::vec3 normal = pos / radius;
+            vertices.push_back({pos, normal});
+        }
+    }
+
+    for (int y = 0; y < rings; ++y)
+    {
+        for (int x = 0; x < segments; ++x)
+        {
+            uint32_t i0 = static_cast<uint32_t>(y * (segments + 1) + x);
+            uint32_t i1 = i0 + 1;
+            uint32_t i2 = i0 + static_cast<uint32_t>(segments + 1);
+            uint32_t i3 = i2 + 1;
+
+            indices.push_back(i0);
+            indices.push_back(i2);
+            indices.push_back(i1);
+
+            indices.push_back(i1);
+            indices.push_back(i2);
+            indices.push_back(i3);
+        }
+    }
+}
 
 #ifdef ORBIT_VK_VALIDATION_LAYERS
 constexpr bool kEnableValidationLayers = true;
@@ -90,20 +187,24 @@ class VulkanViewerApp
     //
     // Order matters and mirrors the dependency chain:
     //   instance -> surface -> physical device -> logical device + queues
-    //   -> swapchain -> render pass -> framebuffers -> command pool/buffers
-    //   -> sync objects.
-    // Each stage needs the one before it to exist.
+    //   -> allocator -> swapchain -> render pass -> pipeline -> framebuffers
+    //   -> command pool/buffers -> mesh buffers -> sync objects.
+    // Mesh buffers need the command pool (for the staging-copy command
+    // buffer) and the allocator (for the buffers themselves), so they have
+    // to come after both.
 
     void initVulkan()
     {
         createInstance();
         createSurface();
         pickPhysicalDeviceAndCreateDevice();
+        createAllocator();
         createSwapchain();
         createRenderPass();
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPoolAndBuffers();
+        createMeshBuffers();
         createSyncObjects();
     }
 
@@ -276,8 +377,8 @@ class VulkanViewerApp
     void createGraphicsPipeline()
     {
         // ---- Programmable stages: load the two shader modules ----
-        auto vertCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/triangle.vert.spv");
-        auto fragCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/triangle.frag.spv");
+        auto vertCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/sphere.vert.spv");
+        auto fragCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/sphere.frag.spv");
         VkShaderModule vertModule = createShaderModule(vertCode);
         VkShaderModule fragModule = createShaderModule(fragCode);
 
@@ -295,14 +396,20 @@ class VulkanViewerApp
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertStageInfo, fragStageInfo};
 
-        // ---- Vertex input: none. The triangle's positions/colors are baked
-        // into the vertex shader itself for this milestone (no vertex buffer
-        // until #72), so there's nothing for the fixed-function vertex-fetch
-        // stage to read from memory.
+        // ---- Vertex input: describes the layout of the real vertex buffer
+        // created in createMeshBuffers() — the fixed-function vertex-fetch
+        // stage uses this to know how to read Vertex structs out of GPU
+        // memory and feed them to the vertex shader's `in` attributes.
+        auto bindingDescription = Vertex::getBindingDescription();
+        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = 0;
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount =
+            static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         // ---- Input assembly: how to group the 3 vertices Vulkan feeds the
         // vertex shader. TRIANGLE_LIST = every 3 vertices forms one
@@ -340,7 +447,14 @@ class VulkanViewerApp
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        // CCW here (vs. #71's flat hardcoded triangle, which needed
+        // CLOCKWISE) because computeMvp()'s projection matrix flips clip-
+        // space Y to correct for GLM assuming OpenGL's Y-up convention —
+        // that flip mirrors the apparent winding of every triangle, so the
+        // "front face" definition has to flip along with it. If the sphere
+        // renders inside-out (you'd see the far side, culled near side), this
+        // is the first thing to check.
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
         // ---- Multisampling: disabled (1 sample/pixel, no MSAA yet).
@@ -363,10 +477,20 @@ class VulkanViewerApp
         colorBlending.pAttachments = &colorBlendAttachment;
 
         // ---- Pipeline layout: describes what external resources (uniform
-        // buffers, textures, push constants) the shaders can access. Empty
-        // for now — nothing but hardcoded data is used yet.
+        // buffers, textures, push constants) the shaders can access. This
+        // milestone adds one push-constant range for the MVP matrix, visible
+        // only to the vertex stage (matches sphere.vert's `layout(push_constant)`
+        // block) — still no descriptor sets, that's for a real uniform
+        // buffer / texture later in the epic.
+        VkPushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(PushConstants);
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
         if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) !=
             VK_SUCCESS)
         {
@@ -459,6 +583,141 @@ class VulkanViewerApp
         {
             throw std::runtime_error("failed to allocate command buffers");
         }
+    }
+
+    void createAllocator()
+    {
+        // VMA needs to know which Vulkan entry points to bind against; the
+        // default (VMA_STATIC_VULKAN_FUNCTIONS, implied when vulkan.h is
+        // visible, which it is via GLFW_INCLUDE_VULKAN above) links directly
+        // against the loader we already link via Vulkan::Vulkan.
+        VmaAllocatorCreateInfo allocatorInfo{};
+        allocatorInfo.physicalDevice = physicalDevice_;
+        allocatorInfo.device = device_;
+        allocatorInfo.instance = instance_;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+
+        if (vmaCreateAllocator(&allocatorInfo, &allocator_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create VMA allocator");
+        }
+    }
+
+    // A short-lived command buffer for one-off GPU work (here, the
+    // staging->device-local buffer copy) that isn't part of the per-frame
+    // render loop. Submitted and waited on synchronously — fine for
+    // one-time setup work, not something you'd do every frame.
+    VkCommandBuffer beginSingleTimeCommands()
+    {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool_;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device_, &allocInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        return commandBuffer;
+    }
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer)
+    {
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        // vkQueueWaitIdle rather than a fence: simplest correct option for
+        // one-time setup work that isn't on the hot per-frame path.
+        vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue_);
+
+        vkFreeCommandBuffers(device_, commandPool_, 1, &commandBuffer);
+    }
+
+    void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size)
+    {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkBufferCopy copyRegion{};
+        copyRegion.size = size;
+        vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copyRegion);
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    // The staging-buffer pattern: data is only ever memcpy'd into
+    // host-visible memory (the staging buffer), never directly into the
+    // device-local buffer the GPU actually reads from during rendering.
+    // Overkill for a mesh this size, but it's the pattern that stays correct
+    // once vertex data is large or updates frequently — the acceptance
+    // criteria for #72 asks for it explicitly for that reason.
+    template <typename T>
+    void uploadViaStagingBuffer(const std::vector<T>& data, VkBufferUsageFlags usage,
+                                VkBuffer& outBuffer, VmaAllocation& outAllocation)
+    {
+        VkDeviceSize bufferSize = sizeof(T) * data.size();
+
+        VkBuffer stagingBuffer;
+        VmaAllocation stagingAllocation;
+        VkBufferCreateInfo stagingInfo{};
+        stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        stagingInfo.size = bufferSize;
+        stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        stagingInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo stagingAllocInfo{};
+        stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                                 VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VmaAllocationInfo stagingInfoOut{};
+        if (vmaCreateBuffer(allocator_, &stagingInfo, &stagingAllocInfo, &stagingBuffer,
+                            &stagingAllocation, &stagingInfoOut) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create staging buffer");
+        }
+        // VMA_ALLOCATION_CREATE_MAPPED_BIT means the allocation is already
+        // mapped and pMappedData is valid immediately — no separate
+        // vmaMapMemory() call needed for a host-visible allocation like this.
+        std::memcpy(stagingInfoOut.pMappedData, data.data(), static_cast<size_t>(bufferSize));
+
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = bufferSize;
+        bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        if (vmaCreateBuffer(allocator_, &bufferInfo, &allocInfo, &outBuffer, &outAllocation,
+                            nullptr) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create device-local buffer");
+        }
+
+        copyBuffer(stagingBuffer, outBuffer, bufferSize);
+
+        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+    }
+
+    void createMeshBuffers()
+    {
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+        generateSphereMesh(kSphereRadius, kSphereSegments, kSphereRings, vertices, indices);
+        sphereIndexCount_ = static_cast<uint32_t>(indices.size());
+
+        uploadViaStagingBuffer(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertexBuffer_,
+                               vertexBufferAllocation_);
+        uploadViaStagingBuffer(indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, indexBuffer_,
+                               indexBufferAllocation_);
     }
 
     void createSyncObjects()
@@ -583,6 +842,31 @@ class VulkanViewerApp
         vkDeviceWaitIdle(device_);
     }
 
+    glm::mat4 computeMvp()
+    {
+        // Slow rotation stands in for real input/camera control, which is
+        // #74's job — this only exists to prove the MVP matrix is actually
+        // recomputed and pushed fresh every frame, not just uploaded once.
+        float time = static_cast<float>(glfwGetTime());
+        glm::mat4 model =
+            glm::rotate(glm::mat4(1.0f), time * glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        glm::vec3 cameraPos(0.0f, 1.5f, 4.0f);
+        glm::mat4 view = glm::lookAt(cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        float aspect = static_cast<float>(swapchainExtent_.width) /
+                       static_cast<float>(swapchainExtent_.height);
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+        // GLM was designed for OpenGL's clip space (Y up, matching the
+        // triangle-vertex convention from #71 that Vulkan itself does NOT
+        // follow — Vulkan's is Y down). This is the standard fix: flip the
+        // single matrix entry that controls clip-space Y scale, rather than
+        // hand-writing a Vulkan-specific projection matrix from scratch.
+        proj[1][1] *= -1.0f;
+
+        return proj * view * model;
+    }
+
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     {
         VkCommandBufferBeginInfo beginInfo{};
@@ -624,10 +908,16 @@ class VulkanViewerApp
         scissor.extent = swapchainExtent_;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        // 3 vertices, 1 instance, starting at vertex 0 / instance 0. The
-        // vertex shader supplies its own positions via gl_VertexIndex, so
-        // there's no vertex buffer to bind yet.
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        VkBuffer vertexBuffers[] = {vertexBuffer_};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+
+        PushConstants pushConstants{computeMvp()};
+        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                           sizeof(PushConstants), &pushConstants);
+
+        vkCmdDrawIndexed(commandBuffer, sphereIndexCount_, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -736,6 +1026,12 @@ class VulkanViewerApp
         vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         vkDestroyRenderPass(device_, renderPass_, nullptr);
 
+        // Buffers must be destroyed before the allocator that owns their
+        // underlying memory.
+        vmaDestroyBuffer(allocator_, vertexBuffer_, vertexBufferAllocation_);
+        vmaDestroyBuffer(allocator_, indexBuffer_, indexBufferAllocation_);
+        vmaDestroyAllocator(allocator_);
+
         vkb::destroy_device(vkbDevice_);
         vkb::destroy_surface(vkbInstance_, surface_);
         vkb::destroy_instance(vkbInstance_);
@@ -773,6 +1069,13 @@ class VulkanViewerApp
     VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
+
+    VmaAllocator allocator_ = VK_NULL_HANDLE;
+    VkBuffer vertexBuffer_ = VK_NULL_HANDLE;
+    VmaAllocation vertexBufferAllocation_ = VK_NULL_HANDLE;
+    VkBuffer indexBuffer_ = VK_NULL_HANDLE;
+    VmaAllocation indexBufferAllocation_ = VK_NULL_HANDLE;
+    uint32_t sphereIndexCount_ = 0;
 
     std::vector<VkSemaphore> imageAvailableSemaphores_;
     std::vector<VkSemaphore> renderFinishedSemaphores_;
