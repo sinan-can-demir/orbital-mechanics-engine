@@ -1,14 +1,16 @@
-// orbit-viewer-vk — Vulkan #70 "Boot" milestone.
+// orbit-viewer-vk — Vulkan #70 "Boot" + #71 "First pipeline + triangle".
 //
-// Goal: open a window and clear it to a solid color every frame, with a
-// swapchain that survives resize, and clean shutdown. No geometry yet —
-// that starts at milestone #71 (first pipeline + triangle).
+// #70 opened a window and cleared it to a solid color every frame, with a
+// swapchain that survives resize, and clean shutdown. #71 adds the graphics
+// pipeline object and renders a single hardcoded triangle with per-vertex
+// colors (src/viewer_vk/shaders/triangle.{vert,frag}), interpolated across
+// its face by the rasterizer.
 //
 // Compared to the OpenGL viewer, nothing here is implicit. OpenGL hides a
 // global state machine behind you; every object below (instance, device,
-// swapchain, render pass, framebuffers, command buffers, sync objects) is
-// something *you* create, configure, and destroy by hand, in a specific
-// order. That's the whole point of the exercise.
+// swapchain, render pass, pipeline, framebuffers, command buffers, sync
+// objects) is something *you* create, configure, and destroy by hand, in a
+// specific order. That's the whole point of the exercise.
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -16,6 +18,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -32,6 +35,22 @@ constexpr bool kEnableValidationLayers = true;
 #else
 constexpr bool kEnableValidationLayers = false;
 #endif
+
+// Reads a compiled SPIR-V binary. std::ios::ate seeks to the end on open, so
+// tellg() immediately below gives the file size without a separate stat call.
+std::vector<char> readSpirvFile(const std::string& path)
+{
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("failed to open shader file: " + path);
+    }
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    std::vector<char> buffer(fileSize);
+    file.seekg(0);
+    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+    return buffer;
+}
 
 } // namespace
 
@@ -82,6 +101,7 @@ class VulkanViewerApp
         pickPhysicalDeviceAndCreateDevice();
         createSwapchain();
         createRenderPass();
+        createGraphicsPipeline();
         createFramebuffers();
         createCommandPoolAndBuffers();
         createSyncObjects();
@@ -231,6 +251,158 @@ class VulkanViewerApp
         {
             throw std::runtime_error("failed to create render pass");
         }
+    }
+
+    VkShaderModule createShaderModule(const std::vector<char>& code)
+    {
+        // A VkShaderModule is just the SPIR-V bytecode wrapped in a Vulkan
+        // handle — no compilation to GPU machine code happens yet. That
+        // happens when the module is referenced inside pipeline creation
+        // below, where the driver can see the *whole* pipeline state at once
+        // and optimize accordingly (part of why pipelines are baked upfront).
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create shader module");
+        }
+        return shaderModule;
+    }
+
+    void createGraphicsPipeline()
+    {
+        // ---- Programmable stages: load the two shader modules ----
+        auto vertCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/triangle.vert.spv");
+        auto fragCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/triangle.frag.spv");
+        VkShaderModule vertModule = createShaderModule(vertCode);
+        VkShaderModule fragModule = createShaderModule(fragCode);
+
+        VkPipelineShaderStageCreateInfo vertStageInfo{};
+        vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertStageInfo.module = vertModule;
+        vertStageInfo.pName = "main"; // entry point function name inside the GLSL
+
+        VkPipelineShaderStageCreateInfo fragStageInfo{};
+        fragStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragStageInfo.module = fragModule;
+        fragStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {vertStageInfo, fragStageInfo};
+
+        // ---- Vertex input: none. The triangle's positions/colors are baked
+        // into the vertex shader itself for this milestone (no vertex buffer
+        // until #72), so there's nothing for the fixed-function vertex-fetch
+        // stage to read from memory.
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        // ---- Input assembly: how to group the 3 vertices Vulkan feeds the
+        // vertex shader. TRIANGLE_LIST = every 3 vertices forms one
+        // independent triangle (vs. TRIANGLE_STRIP, LINE_LIST, POINT_LIST...).
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        // ---- Viewport/scissor: made *dynamic* (set per-frame via
+        // vkCmdSetViewport/vkCmdSetScissor in recordCommandBuffer) rather than
+        // baked into the pipeline, since the window — and therefore the
+        // swapchain extent — can resize. Baking a fixed size in would mean
+        // rebuilding the whole pipeline on every resize.
+        std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
+                                                     VK_DYNAMIC_STATE_SCISSOR};
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicState.pDynamicStates = dynamicStates.data();
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.scissorCount = 1;
+
+        // ---- Rasterizer: turns the triangle into fragments (candidate
+        // pixels). FILL = solid triangles (vs. LINE for wireframe, POINT for
+        // vertices only) — useful to know, that's a one-line swap to see the
+        // wireframe later if you're curious.
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        // ---- Multisampling: disabled (1 sample/pixel, no MSAA yet).
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // ---- Color blending: no blending, just overwrite the framebuffer
+        // pixel with whatever the fragment shader outputs (opaque triangle).
+        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+
+        // ---- Pipeline layout: describes what external resources (uniform
+        // buffers, textures, push constants) the shaders can access. Empty
+        // for now — nothing but hardcoded data is used yet.
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) !=
+            VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create pipeline layout");
+        }
+
+        // ---- Tie it all together into one immutable VkPipeline. renderPass_
+        // + subpass = 0 tells the driver which framebuffer attachment layout
+        // this pipeline is compatible with.
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.layout = pipelineLayout_;
+        pipelineInfo.renderPass = renderPass_;
+        pipelineInfo.subpass = 0;
+
+        if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                      &graphicsPipeline_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create graphics pipeline");
+        }
+
+        // Shader modules are only needed during pipeline creation above — the
+        // driver has already consumed and compiled the bytecode by this
+        // point, so these can be destroyed immediately rather than kept
+        // around for the app's lifetime.
+        vkDestroyShaderModule(device_, fragModule, nullptr);
+        vkDestroyShaderModule(device_, vertModule, nullptr);
     }
 
     void createFramebuffers()
@@ -431,10 +603,32 @@ class VulkanViewerApp
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColor;
 
-        // Everything between vkCmdBeginRenderPass and vkCmdEndRenderPass is
-        // where actual draw calls will go, starting at milestone #71. For now
-        // the clear (LOAD_OP_CLEAR above) is the entire frame's content.
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+        // Viewport/scissor were declared dynamic in the pipeline, so they
+        // must be set here, every frame, using the current swapchain extent
+        // (which changes across recreateSwapchain() on resize).
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(swapchainExtent_.width);
+        viewport.height = static_cast<float>(swapchainExtent_.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = swapchainExtent_;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        // 3 vertices, 1 instance, starting at vertex 0 / instance 0. The
+        // vertex shader supplies its own positions via gl_VertexIndex, so
+        // there's no vertex buffer to bind yet.
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
         vkCmdEndRenderPass(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
@@ -538,6 +732,8 @@ class VulkanViewerApp
             vkDestroyFence(device_, inFlightFences_[i], nullptr);
         }
         vkDestroyCommandPool(device_, commandPool_, nullptr);
+        vkDestroyPipeline(device_, graphicsPipeline_, nullptr);
+        vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         vkDestroyRenderPass(device_, renderPass_, nullptr);
 
         vkb::destroy_device(vkbDevice_);
@@ -573,6 +769,8 @@ class VulkanViewerApp
     std::vector<VkFramebuffer> framebuffers_;
 
     VkRenderPass renderPass_ = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
 
