@@ -1,27 +1,36 @@
 #version 450
 
-// Real vertex attributes this time, read from the vertex buffer instead of
-// a hardcoded shader-local array — location numbers here must match the
-// VkVertexInputAttributeDescription offsets set up in createGraphicsPipeline().
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 
-// Push constants: a small block of data written straight into the command
-// buffer each frame (vkCmdPushConstants), instead of a full uniform-buffer +
-// descriptor-set setup. A 4x4 matrix is 64 bytes, comfortably inside the
-// typical 128-byte push-constant budget, so this sidesteps descriptor sets
-// entirely for this milestone.
+// xyz = this body's world-space position, w = its radius. Packed into a
+// single vec4 (rather than a separate vec3 + float) specifically to dodge a
+// classic Vulkan/GLSL gotcha: a lone vec3 in a push-constant/uniform block
+// still reserves a 16-byte-aligned slot, but exactly how a *following*
+// scalar packs against it is easy to get subtly wrong between the C++
+// struct and the GLSL block. A vec4 has no such ambiguity on either side.
 layout(push_constant) uniform PushConstants {
     mat4 mvp;
+    vec4 worldOffsetAndRadius;
 } pc;
 
 layout(location = 0) out vec3 fragNormal;
+layout(location = 1) out vec3 fragWorldPos;
 
 void main() {
+    vec3 worldOffset = pc.worldOffsetAndRadius.xyz;
+    float radius = pc.worldOffsetAndRadius.w;
+
+    // The CPU builds mvp from the same translate(worldOffset) * scale(radius)
+    // model transform applied here, so gl_Position and fragWorldPos must
+    // compute it identically to stay in sync.
+    fragWorldPos = inPosition * radius + worldOffset;
     gl_Position = pc.mvp * vec4(inPosition, 1.0);
-    // Passing the *object-space* normal through unTransformed is only
-    // correct because our model matrix is a pure rotation (no non-uniform
-    // scale) — a general renderer would transform normals by the inverse
-    // transpose of the model matrix instead.
+
+    // Translation + *uniform* scale only (no rotation, no non-uniform
+    // scale) — neither operation rotates or skews a normal, only its
+    // length, and we normalize in the fragment shader anyway. So the
+    // object-space normal is already correct in world space; a
+    // general-purpose renderer would instead need mat3(transpose(inverse(model))).
     fragNormal = inNormal;
 }

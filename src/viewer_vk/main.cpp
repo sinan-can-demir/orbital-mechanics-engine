@@ -1,19 +1,30 @@
 // orbit-viewer-vk — Vulkan #70 "Boot" + #71 "First pipeline + triangle" +
-// #72 "Sphere mesh: vertex/index buffers via VMA, MVP uniforms".
+// #72 "Sphere mesh via VMA" + #73 "Lighting + orbit trails".
 //
-// #70 opened a window and cleared it to a solid color every frame, with a
-// swapchain that survives resize, and clean shutdown. #71 added the graphics
-// pipeline object and rendered a single hardcoded triangle. #72 replaces
-// that triangle with a real UV-sphere mesh: vertex/index data uploaded to
-// device-local GPU memory via VMA (through a staging-buffer copy), and an
-// MVP matrix pushed to the vertex shader every frame via push constants
-// (src/viewer_vk/shaders/sphere.{vert,frag}).
+// #70 opened a window and cleared it to a solid color every frame. #71 added
+// the graphics pipeline object and a hardcoded triangle. #72 replaced that
+// triangle with a real UV-sphere mesh uploaded via VMA. #73 reaches visual
+// parity with the OpenGL viewer's core look for a small hardcoded 3-body
+// scene (Sun/Earth/Moon, procedurally animated — not loaded from a CSV, a
+// deliberate scope choice to keep this milestone about Vulkan concepts, not
+// file parsing): lit spheres per body (Blinn-Phong, ported from
+// src/viewer/orbit_viewer.cpp), growing orbit-trail line strips, and the two
+// biggest remaining OpenGL-vs-Vulkan conceptual gaps — a second,
+// topology-specific pipeline, and descriptor sets for per-body uniforms
+// (color, light position, view position) instead of ad-hoc glUniform calls.
+//
+// This milestone also adds a depth buffer, which #71/#72 didn't need (a
+// single convex sphere with back-face culling never overlaps itself in
+// depth) but three separate bodies at different distances absolutely can —
+// without one, overlapping bodies would render in draw-call order instead
+// of correct front-to-back order.
 //
 // Compared to the OpenGL viewer, nothing here is implicit. OpenGL hides a
 // global state machine behind you; every object below (instance, device,
-// swapchain, render pass, pipeline, buffers, framebuffers, command buffers,
-// sync objects) is something *you* create, configure, and destroy by hand,
-// in a specific order. That's the whole point of the exercise.
+// swapchain, render pass, pipelines, descriptor sets, buffers, framebuffers,
+// command buffers, sync objects) is something *you* create, configure, and
+// destroy by hand, in a specific order. That's the whole point of the
+// exercise.
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -23,6 +34,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -31,6 +43,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace
@@ -40,13 +53,33 @@ constexpr uint32_t kInitialWidth = 1280;
 constexpr uint32_t kInitialHeight = 720;
 constexpr int kMaxFramesInFlight = 2;
 
-constexpr float kSphereRadius = 1.0f;
-constexpr int kSphereSegments = 32;
-constexpr int kSphereRings = 16;
+constexpr float kSphereRadius = 1.0f; // unit sphere; per-body radius applied via push constants
+constexpr int kSphereSegments = 64;
+constexpr int kSphereRings = 32;
 
-// Position + normal, read from a real vertex buffer this milestone instead
-// of being hardcoded inside the shader (see #71's triangle for the
-// hardcoded version this replaces).
+// Hardcoded scene constants (see the file header for why this isn't loaded
+// from a CSV). Orbit radii/periods are arbitrary "looks reasonable on
+// screen" values, not physically scaled.
+// Body radii are wildly exaggerated relative to orbit distances — real
+// solar-system proportions render as invisible dots, so every orbit
+// visualization (including this project's OpenGL viewer) fakes the scale.
+// These specific values were tuned so each body subtends enough angular
+// size from the fixed camera below for Blinn-Phong shading to actually show
+// visible curvature — too small and a sphere looks like a flat disc
+// regardless of how correct the lighting math is (the normal barely varies
+// across a few degrees of angular size).
+constexpr float kSunRadius = 1.4f;
+constexpr float kEarthRadius = 0.55f;
+constexpr float kMoonRadius = 0.22f;
+constexpr float kEarthOrbitRadius = 3.5f;
+constexpr float kEarthOrbitPeriod = 12.0f; // seconds per revolution
+constexpr float kMoonOrbitRadius = 1.1f;
+constexpr float kMoonOrbitPeriod = 2.0f;
+constexpr int kTrailSamples = 512;
+constexpr float kTrailDuration = kEarthOrbitPeriod; // time to fully reveal a trail
+
+// Position + normal, read from a real vertex buffer (see #72) rather than
+// hardcoded inside the shader (see #71's triangle).
 struct Vertex
 {
     glm::vec3 pos;
@@ -77,9 +110,56 @@ struct Vertex
     }
 };
 
-struct PushConstants
+// A single position, for orbit-trail line strips — no normal needed, trails
+// aren't lit.
+struct LineVertex
+{
+    glm::vec3 pos;
+
+    static VkVertexInputBindingDescription getBindingDescription()
+    {
+        VkVertexInputBindingDescription binding{};
+        binding.binding = 0;
+        binding.stride = sizeof(LineVertex);
+        binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return binding;
+    }
+
+    static VkVertexInputAttributeDescription getAttributeDescription()
+    {
+        VkVertexInputAttributeDescription attr{};
+        attr.binding = 0;
+        attr.location = 0;
+        attr.format = VK_FORMAT_R32G32B32_SFLOAT;
+        attr.offset = 0;
+        return attr;
+    }
+};
+
+struct SpherePushConstants
 {
     glm::mat4 mvp;
+    glm::vec4 worldOffsetAndRadius; // xyz = world position, w = radius
+};
+
+struct OrbitPushConstants
+{
+    glm::mat4 vp;
+    glm::vec4 color; // xyz used; w unused, keeps the block free of packing ambiguity
+};
+
+// Mirrors sphere.frag's BodyUBO block field-for-field. Each glm::vec3 is
+// explicitly padded to 16 bytes (alignas(16)) to match std140's rule that a
+// vec3's *base alignment* is always 16, same as vec4 — get this wrong and
+// the GPU reads the wrong bytes for each field, a classic and easy-to-miss
+// Vulkan uniform-buffer bug.
+struct BodyUBO
+{
+    alignas(16) glm::vec3 color;
+    alignas(16) glm::vec3 lightPos;
+    // xyz = camera position, w = 1.0 for the emissive body (the Sun), 0.0
+    // otherwise — mirrors sphere.frag's BodyUBO block field-for-field.
+    alignas(16) glm::vec4 viewPosAndEmissive;
 };
 
 // Backend-agnostic UV-sphere geometry generation, lifted out of the
@@ -126,6 +206,38 @@ void generateSphereMesh(float radius, int segments, int rings, std::vector<Verte
         }
     }
 }
+
+// Pure functions of time, used both to animate each body live every frame
+// and to precompute its full orbit trail upfront (see createBodies()) —
+// using the same formula for both means the trail is guaranteed to actually
+// pass through the sphere's rendered position at every past moment.
+glm::vec3 sunPositionAt(float /*t*/) { return glm::vec3(0.0f); }
+
+glm::vec3 earthPositionAt(float t)
+{
+    float angle = (t / kEarthOrbitPeriod) * 2.0f * static_cast<float>(M_PI);
+    return glm::vec3(kEarthOrbitRadius * std::cos(angle), 0.0f,
+                     kEarthOrbitRadius * std::sin(angle));
+}
+
+glm::vec3 moonPositionAt(float t)
+{
+    float angle = (t / kMoonOrbitPeriod) * 2.0f * static_cast<float>(M_PI);
+    return earthPositionAt(t) +
+           glm::vec3(kMoonOrbitRadius * std::cos(angle), 0.0f, kMoonOrbitRadius * std::sin(angle));
+}
+
+struct RenderBody
+{
+    std::string name;
+    glm::vec3 color;
+    float radius;
+    glm::vec3 (*positionFn)(float);
+
+    VkBuffer trailBuffer = VK_NULL_HANDLE;
+    VmaAllocation trailBufferAllocation = VK_NULL_HANDLE;
+    uint32_t trailPointCount = 0; // 0 for the Sun: it doesn't move, no trail to show
+};
 
 #ifdef ORBIT_VK_VALIDATION_LAYERS
 constexpr bool kEnableValidationLayers = true;
@@ -185,13 +297,14 @@ class VulkanViewerApp
 
     // ---- Vulkan bring-up -------------------------------------------------
     //
-    // Order matters and mirrors the dependency chain:
-    //   instance -> surface -> physical device -> logical device + queues
-    //   -> allocator -> swapchain -> render pass -> pipeline -> framebuffers
-    //   -> command pool/buffers -> mesh buffers -> sync objects.
-    // Mesh buffers need the command pool (for the staging-copy command
-    // buffer) and the allocator (for the buffers themselves), so they have
-    // to come after both.
+    // Order matters and mirrors the dependency chain: instance -> surface ->
+    // physical device -> logical device + queues -> allocator -> swapchain
+    // -> depth image (needs allocator + swapchain extent) -> descriptor set
+    // layout (needed by pipeline layouts) -> render pass (needs the depth
+    // format) -> pipelines -> framebuffers (need the depth image view) ->
+    // command pool/buffers -> mesh + body/trail buffers (need the command
+    // pool for staging copies) -> descriptor pool/UBOs/sets (need the body
+    // count from createBodies()) -> sync objects.
 
     void initVulkan()
     {
@@ -200,11 +313,19 @@ class VulkanViewerApp
         pickPhysicalDeviceAndCreateDevice();
         createAllocator();
         createSwapchain();
+        createDepthResources();
+        createColorResources();
+        createDescriptorSetLayout();
         createRenderPass();
-        createGraphicsPipeline();
+        createSpherePipeline();
+        createOrbitPipeline();
         createFramebuffers();
         createCommandPoolAndBuffers();
         createMeshBuffers();
+        createBodies();
+        createDescriptorPool();
+        createBodyUniformBuffers();
+        createDescriptorSets();
         createSyncObjects();
     }
 
@@ -242,8 +363,19 @@ class VulkanViewerApp
         // Physical device = an actual GPU in the machine. Logical device (below)
         // = your application's private handle to it, through which every other
         // Vulkan call is dispatched.
+        // wideLines lifts VkPipelineRasterizationStateCreateInfo::lineWidth
+        // above 1.0 — without requesting it, a driver may reject any
+        // non-default line width outright. Requesting it here restricts
+        // physical-device selection to GPUs that actually support it, and
+        // vk-bootstrap enables it automatically on the logical device below.
+        VkPhysicalDeviceFeatures requiredFeatures{};
+        requiredFeatures.wideLines = VK_TRUE;
+
         vkb::PhysicalDeviceSelector selector{vkbInstance_};
-        auto physRet = selector.set_surface(surface_).set_minimum_version(1, 2).select();
+        auto physRet = selector.set_surface(surface_)
+                           .set_minimum_version(1, 2)
+                           .set_required_features(requiredFeatures)
+                           .select();
         if (!physRet)
         {
             throw std::runtime_error("failed to select Vulkan physical device: " +
@@ -275,6 +407,33 @@ class VulkanViewerApp
         graphicsQueue_ = graphicsQueueRet.value();
         presentQueue_ = presentQueueRet.value();
         graphicsQueueFamily_ = vkbDevice_.get_queue_index(vkb::QueueType::graphics).value();
+
+        msaaSamples_ = getMaxUsableSampleCount();
+    }
+
+    // MSAA (multisample anti-aliasing) smooths the jagged, stair-stepped
+    // edges you get from rendering at 1 sample/pixel — every silhouette
+    // edge (sphere outlines especially) picks up intermediate blended
+    // colors instead of a hard binary in/out decision. Not every sample
+    // count a GPU *could* support is worth using; cap at 8 rather than
+    // whatever the hardware maximum is (sometimes higher) for a sane
+    // perf/quality tradeoff on a scene this simple.
+    VkSampleCountFlagBits getMaxUsableSampleCount()
+    {
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(physicalDevice_, &props);
+        VkSampleCountFlags counts =
+            props.limits.framebufferColorSampleCounts & props.limits.framebufferDepthSampleCounts;
+
+        for (VkSampleCountFlagBits bit :
+             {VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_2_BIT})
+        {
+            if (counts & bit)
+            {
+                return bit;
+            }
+        }
+        return VK_SAMPLE_COUNT_1_BIT;
     }
 
     void createSwapchain()
@@ -303,46 +462,257 @@ class VulkanViewerApp
         swapchainImageViews_ = vkbSwapchain_.get_image_views().value();
     }
 
+    // ---- Depth buffer ---------------------------------------------------
+    //
+    // #71/#72 never needed one: a single convex sphere with back-face
+    // culling can't occlude itself incorrectly. Three separate bodies at
+    // different distances can and do overlap on screen, so without a depth
+    // buffer they'd render in draw-call order rather than correct
+    // front-to-back order.
+
+    VkFormat findDepthFormat()
+    {
+        // Not every format is guaranteed to support
+        // VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT on every driver —
+        // query instead of assuming, and take the first candidate that does.
+        std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                                            VK_FORMAT_D24_UNORM_S8_UINT};
+        for (VkFormat format : candidates)
+        {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &props);
+            if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+            {
+                return format;
+            }
+        }
+        throw std::runtime_error("failed to find a supported depth format");
+    }
+
+    void createDepthResources()
+    {
+        if (depthFormat_ == VK_FORMAT_UNDEFINED)
+        {
+            depthFormat_ = findDepthFormat();
+        }
+
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent = {swapchainExtent_.width, swapchainExtent_.height, 1};
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = depthFormat_;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        // Must match the color attachment's sample count — a render pass
+        // requires every attachment used by the same subpass to agree on it.
+        imageInfo.samples = msaaSamples_;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        if (vmaCreateImage(allocator_, &imageInfo, &allocInfo, &depthImage_, &depthImageAllocation_,
+                           nullptr) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create depth image");
+        }
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = depthImage_;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = depthFormat_;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device_, &viewInfo, nullptr, &depthImageView_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create depth image view");
+        }
+    }
+
+    void cleanupDepthResources()
+    {
+        vkDestroyImageView(device_, depthImageView_, nullptr);
+        vmaDestroyImage(allocator_, depthImage_, depthImageAllocation_);
+    }
+
+    // The actual rendering happens into this multisampled color image, not
+    // directly into a swapchain image — swapchain images are always 1
+    // sample (that's what gets presented), so the render pass's resolve
+    // step (see createRenderPass()) downsamples this into the swapchain
+    // image at the end of the subpass. TRANSIENT_ATTACHMENT_BIT tells the
+    // driver its contents never need to survive outside this one render
+    // pass, which on tile-based GPUs means it may never even hit real VRAM.
+    void createColorResources()
+    {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent = {swapchainExtent_.width, swapchainExtent_.height, 1};
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = swapchainImageFormat_;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage =
+            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        imageInfo.samples = msaaSamples_;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        if (vmaCreateImage(allocator_, &imageInfo, &allocInfo, &colorImage_, &colorImageAllocation_,
+                           nullptr) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create MSAA color image");
+        }
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = colorImage_;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = swapchainImageFormat_;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device_, &viewInfo, nullptr, &colorImageView_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create MSAA color image view");
+        }
+    }
+
+    void cleanupColorResources()
+    {
+        vkDestroyImageView(device_, colorImageView_, nullptr);
+        vmaDestroyImage(allocator_, colorImage_, colorImageAllocation_);
+    }
+
+    // ---- Descriptor set layout ---------------------------------------------
+    //
+    // The layout is just a schema — "binding 0 is one uniform buffer,
+    // visible to the fragment stage" — created once and shared by every
+    // body's actual descriptor set (created later in createDescriptorSets(),
+    // once we know how many bodies there are).
+
+    void createDescriptorSetLayout()
+    {
+        VkDescriptorSetLayoutBinding binding{};
+        binding.binding = 0;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &binding;
+
+        if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &descriptorSetLayout_) !=
+            VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create descriptor set layout");
+        }
+    }
+
     void createRenderPass()
     {
         // A render pass describes *what kind* of attachments a frame uses and
         // how their contents transition across the frame (load, store, and the
         // image layout before/after) — not the actual pixels, just the plan.
+        // Rendered into at msaaSamples_ samples/pixel, never presented
+        // directly — resolved down to 1 sample by the resolve attachment
+        // below at the end of the subpass.
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapchainImageFormat_;
-        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.samples = msaaSamples_;
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        // The resolve step reads it, not anything outside this render pass —
+        // DONT_CARE lets a tile-based GPU skip writing it to memory at all.
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription depthAttachment{};
+        depthAttachment.format = depthFormat_;
+        depthAttachment.samples = msaaSamples_;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        // We never read the depth buffer back after the frame — DONT_CARE
+        // lets the driver skip writing it out, unlike the color attachment.
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        // The actual swapchain image (always 1 sample) — the subpass writes
+        // the final resolved (downsampled) pixels here via pResolveAttachments
+        // below, entirely as a side effect of the driver's fixed-function
+        // multisample resolve; no shader/draw call targets this directly.
+        VkAttachmentDescription colorResolveAttachment{};
+        colorResolveAttachment.format = swapchainImageFormat_;
+        colorResolveAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorResolveAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorResolveAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorResolveAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorResolveAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorResolveAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorResolveAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference colorResolveRef{};
+        colorResolveRef.attachment = 2;
+        colorResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        subpass.pResolveAttachments = &colorResolveRef;
 
-        // The implicit "external" subpass boundary needs an explicit dependency
-        // telling the GPU not to start the color-attachment write stage until
+        // The implicit "external" subpass boundary needs an explicit
+        // dependency telling the GPU not to start color/depth writes until
         // the swapchain image is actually available (signaled by the
-        // image-available semaphore in drawFrame()).
+        // image-available semaphore in drawFrame()) — extended this
+        // milestone to also cover the depth-testing pipeline stage.
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         dependency.srcAccessMask = 0;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.dstAccessMask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment,
+                                                              colorResolveAttachment};
 
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
@@ -374,7 +744,22 @@ class VulkanViewerApp
         return shaderModule;
     }
 
-    void createGraphicsPipeline()
+    // Depth-stencil state is identical for both pipelines this milestone
+    // (test + write enabled, standard "closer wins" compare op) — factored
+    // out so createSpherePipeline() and createOrbitPipeline() don't repeat it.
+    VkPipelineDepthStencilStateCreateInfo makeDepthStencilState()
+    {
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
+        return depthStencil;
+    }
+
+    void createSpherePipeline()
     {
         // ---- Programmable stages: load the two shader modules ----
         auto vertCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/sphere.vert.spv");
@@ -411,9 +796,9 @@ class VulkanViewerApp
             static_cast<uint32_t>(attributeDescriptions.size());
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
-        // ---- Input assembly: how to group the 3 vertices Vulkan feeds the
+        // ---- Input assembly: how to group the vertices Vulkan feeds the
         // vertex shader. TRIANGLE_LIST = every 3 vertices forms one
-        // independent triangle (vs. TRIANGLE_STRIP, LINE_LIST, POINT_LIST...).
+        // independent triangle.
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -438,8 +823,7 @@ class VulkanViewerApp
 
         // ---- Rasterizer: turns the triangle into fragments (candidate
         // pixels). FILL = solid triangles (vs. LINE for wireframe, POINT for
-        // vertices only) — useful to know, that's a one-line swap to see the
-        // wireframe later if you're curious.
+        // vertices only).
         VkPipelineRasterizationStateCreateInfo rasterizer{};
         rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         rasterizer.depthClampEnable = VK_FALSE;
@@ -448,23 +832,25 @@ class VulkanViewerApp
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
         // CCW here (vs. #71's flat hardcoded triangle, which needed
-        // CLOCKWISE) because computeMvp()'s projection matrix flips clip-
-        // space Y to correct for GLM assuming OpenGL's Y-up convention —
-        // that flip mirrors the apparent winding of every triangle, so the
-        // "front face" definition has to flip along with it. If the sphere
-        // renders inside-out (you'd see the far side, culled near side), this
-        // is the first thing to check.
+        // CLOCKWISE) because the projection matrix flips clip-space Y to
+        // correct for GLM assuming OpenGL's Y-up convention — that flip
+        // mirrors the apparent winding of every triangle, so the "front
+        // face" definition has to flip along with it.
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
-        // ---- Multisampling: disabled (1 sample/pixel, no MSAA yet).
+        // ---- Multisampling: must match the render pass's attachment sample
+        // count (msaaSamples_) — the pipeline and the attachments it draws
+        // into have to agree on this.
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE;
-        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        multisampling.rasterizationSamples = msaaSamples_;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil = makeDepthStencilState();
 
         // ---- Color blending: no blending, just overwrite the framebuffer
-        // pixel with whatever the fragment shader outputs (opaque triangle).
+        // pixel with whatever the fragment shader outputs (opaque sphere).
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                               VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -476,25 +862,25 @@ class VulkanViewerApp
         colorBlending.attachmentCount = 1;
         colorBlending.pAttachments = &colorBlendAttachment;
 
-        // ---- Pipeline layout: describes what external resources (uniform
-        // buffers, textures, push constants) the shaders can access. This
-        // milestone adds one push-constant range for the MVP matrix, visible
-        // only to the vertex stage (matches sphere.vert's `layout(push_constant)`
-        // block) — still no descriptor sets, that's for a real uniform
-        // buffer / texture later in the epic.
+        // ---- Pipeline layout: one push-constant range for the MVP +
+        // world-offset/radius (vertex stage only), plus the per-body
+        // descriptor set layout for color/light/view (fragment stage,
+        // bound to an actual buffer per body in recordCommandBuffer).
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushConstantRange.offset = 0;
-        pushConstantRange.size = sizeof(PushConstants);
+        pushConstantRange.size = sizeof(SpherePushConstants);
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-        if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) !=
+        if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &spherePipelineLayout_) !=
             VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create pipeline layout");
+            throw std::runtime_error("failed to create sphere pipeline layout");
         }
 
         // ---- Tie it all together into one immutable VkPipeline. renderPass_
@@ -509,16 +895,17 @@ class VulkanViewerApp
         pipelineInfo.pViewportState = &viewportState;
         pipelineInfo.pRasterizationState = &rasterizer;
         pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = &depthStencil;
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = pipelineLayout_;
+        pipelineInfo.layout = spherePipelineLayout_;
         pipelineInfo.renderPass = renderPass_;
         pipelineInfo.subpass = 0;
 
         if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-                                      &graphicsPipeline_) != VK_SUCCESS)
+                                      &spherePipeline_) != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create graphics pipeline");
+            throw std::runtime_error("failed to create sphere graphics pipeline");
         }
 
         // Shader modules are only needed during pipeline creation above — the
@@ -529,21 +916,151 @@ class VulkanViewerApp
         vkDestroyShaderModule(device_, vertModule, nullptr);
     }
 
+    // A second, topology-specific pipeline for orbit trails. Vulkan bakes
+    // primitive topology into the pipeline object — unlike OpenGL, where
+    // glDrawArrays(GL_LINE_STRIP, ...) vs glDrawElements(GL_TRIANGLES, ...)
+    // is just a different argument to the same draw call, switching
+    // topology in Vulkan means switching to a whole different VkPipeline.
+    void createOrbitPipeline()
+    {
+        auto vertCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/orbit.vert.spv");
+        auto fragCode = readSpirvFile(std::string(ORBIT_VK_SHADER_DIR) + "/orbit.frag.spv");
+        VkShaderModule vertModule = createShaderModule(vertCode);
+        VkShaderModule fragModule = createShaderModule(fragCode);
+
+        VkPipelineShaderStageCreateInfo vertStageInfo{};
+        vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertStageInfo.module = vertModule;
+        vertStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragStageInfo{};
+        fragStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragStageInfo.module = fragModule;
+        fragStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {vertStageInfo, fragStageInfo};
+
+        auto bindingDescription = LineVertex::getBindingDescription();
+        auto attributeDescription = LineVertex::getAttributeDescription();
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount = 1;
+        vertexInputInfo.pVertexAttributeDescriptions = &attributeDescription;
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
+                                                     VK_DYNAMIC_STATE_SCISSOR};
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicState.pDynamicStates = dynamicStates.data();
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.scissorCount = 1;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 2.0f; // matches the OpenGL viewer's glLineWidth(2.0f); needs
+                                     // wideLines (requested above)
+        rasterizer.cullMode = VK_CULL_MODE_NONE; // lines have no "back face"
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = msaaSamples_;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil = makeDepthStencilState();
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+
+        // No descriptor sets — a trail only needs a view-projection matrix
+        // and a flat color, both small enough for push constants, visible to
+        // both stages since orbit.frag reads pc.color.
+        VkPushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(OrbitPushConstants);
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+        if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &orbitPipelineLayout_) !=
+            VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create orbit pipeline layout");
+        }
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = &depthStencil;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.layout = orbitPipelineLayout_;
+        pipelineInfo.renderPass = renderPass_;
+        pipelineInfo.subpass = 0;
+
+        if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                      &orbitPipeline_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create orbit graphics pipeline");
+        }
+
+        vkDestroyShaderModule(device_, fragModule, nullptr);
+        vkDestroyShaderModule(device_, vertModule, nullptr);
+    }
+
     void createFramebuffers()
     {
         // A framebuffer binds concrete image views to a render pass's attachment
-        // slots. We need one per swapchain image, since each is a distinct
-        // image the GPU might be rendering into at any given time.
+        // slots, in the same order the render pass declared them (color-msaa,
+        // depth-msaa, color-resolve). We need one per swapchain image, since
+        // each is a distinct resolve target the GPU might write into at any
+        // given time — but the MSAA color/depth views are shared across all
+        // of them, since only one frame is ever actually mid-render at once.
         framebuffers_.resize(swapchainImageViews_.size());
         for (size_t i = 0; i < swapchainImageViews_.size(); ++i)
         {
-            VkImageView attachments[] = {swapchainImageViews_[i]};
+            std::array<VkImageView, 3> attachments = {colorImageView_, depthImageView_,
+                                                      swapchainImageViews_[i]};
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass = renderPass_;
-            framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            framebufferInfo.pAttachments = attachments.data();
             framebufferInfo.width = swapchainExtent_.width;
             framebufferInfo.height = swapchainExtent_.height;
             framebufferInfo.layers = 1;
@@ -654,9 +1171,8 @@ class VulkanViewerApp
     // The staging-buffer pattern: data is only ever memcpy'd into
     // host-visible memory (the staging buffer), never directly into the
     // device-local buffer the GPU actually reads from during rendering.
-    // Overkill for a mesh this size, but it's the pattern that stays correct
-    // once vertex data is large or updates frequently — the acceptance
-    // criteria for #72 asks for it explicitly for that reason.
+    // Used for anything uploaded once and never touched by the CPU again:
+    // the sphere mesh, and each body's precomputed orbit trail below.
     template <typename T>
     void uploadViaStagingBuffer(const std::vector<T>& data, VkBufferUsageFlags usage,
                                 VkBuffer& outBuffer, VmaAllocation& outAllocation)
@@ -718,6 +1234,142 @@ class VulkanViewerApp
                                vertexBufferAllocation_);
         uploadViaStagingBuffer(indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, indexBuffer_,
                                indexBufferAllocation_);
+    }
+
+    // The hardcoded 3-body scene (see the file header for why this isn't
+    // loaded from a CSV). Each body's orbit trail is precomputed here by
+    // sampling its own live position function across one full
+    // kTrailDuration — the same function recordCommandBuffer() calls every
+    // frame to place the sphere — and uploaded once via the staging-buffer
+    // pattern, exactly like the sphere mesh. "Growing" a trail during
+    // playback then just means drawing an increasing *prefix* of this
+    // already-uploaded buffer (see recordCommandBuffer()), not re-uploading
+    // anything — the actual technique the OpenGL viewer uses too
+    // (src/viewer/orbit_viewer.cpp draws glDrawArrays(GL_LINE_STRIP, 0,
+    // count) with a growing count against a buffer it also only uploads
+    // once).
+    void createBodies()
+    {
+        bodies_.push_back({"Sun", glm::vec3(1.0f, 0.85f, 0.3f), kSunRadius, sunPositionAt});
+        bodies_.push_back({"Earth", glm::vec3(0.25f, 0.55f, 1.0f), kEarthRadius, earthPositionAt});
+        bodies_.push_back({"Moon", glm::vec3(0.65f, 0.65f, 0.65f), kMoonRadius, moonPositionAt});
+
+        // The Sun doesn't move in this scene, so it has no meaningful trail
+        // (index 0, skipped below).
+        for (size_t i = 1; i < bodies_.size(); ++i)
+        {
+            RenderBody& body = bodies_[i];
+            std::vector<LineVertex> trail;
+            trail.reserve(kTrailSamples);
+            for (int s = 0; s < kTrailSamples; ++s)
+            {
+                float t =
+                    kTrailDuration * static_cast<float>(s) / static_cast<float>(kTrailSamples - 1);
+                trail.push_back({body.positionFn(t)});
+            }
+            body.trailPointCount = static_cast<uint32_t>(trail.size());
+            uploadViaStagingBuffer(trail, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, body.trailBuffer,
+                                   body.trailBufferAllocation);
+        }
+    }
+
+    // ---- Descriptor pool, per-body uniform buffers, and descriptor sets ---
+    //
+    // One VkBuffer + one VkDescriptorSet per (body, frame-in-flight) pair —
+    // frame-in-flight, because up to kMaxFramesInFlight command buffers can
+    // be in the GPU's queue at once (see createSyncObjects()), and
+    // overwriting a UBO that an earlier frame's command buffer might still
+    // be reading from would be a race condition.
+
+    void createDescriptorPool()
+    {
+        uint32_t setCount = static_cast<uint32_t>(bodies_.size() * kMaxFramesInFlight);
+
+        VkDescriptorPoolSize poolSize{};
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = setCount;
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = setCount;
+
+        if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create descriptor pool");
+        }
+    }
+
+    void createBodyUniformBuffers()
+    {
+        size_t total = bodies_.size() * kMaxFramesInFlight;
+        bodyUboBuffers_.resize(total);
+        bodyUboAllocations_.resize(total);
+        bodyUboMapped_.resize(total);
+
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = sizeof(BodyUBO);
+        bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        // Uniform buffers are rewritten every frame, so a persistently-
+        // mapped host-visible allocation (no staging buffer) is the right
+        // call here — unlike the sphere mesh/trails above, which are
+        // uploaded once and never touched by the CPU again.
+        allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                          VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        for (size_t i = 0; i < total; ++i)
+        {
+            VmaAllocationInfo outInfo{};
+            if (vmaCreateBuffer(allocator_, &bufferInfo, &allocInfo, &bodyUboBuffers_[i],
+                                &bodyUboAllocations_[i], &outInfo) != VK_SUCCESS)
+            {
+                throw std::runtime_error("failed to create body uniform buffer");
+            }
+            bodyUboMapped_[i] = outInfo.pMappedData;
+        }
+    }
+
+    void createDescriptorSets()
+    {
+        size_t total = bodies_.size() * kMaxFramesInFlight;
+        std::vector<VkDescriptorSetLayout> layouts(total, descriptorSetLayout_);
+
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool_;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(total);
+        allocInfo.pSetLayouts = layouts.data();
+
+        bodyDescriptorSets_.resize(total);
+        if (vkAllocateDescriptorSets(device_, &allocInfo, bodyDescriptorSets_.data()) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to allocate descriptor sets");
+        }
+
+        for (size_t i = 0; i < total; ++i)
+        {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = bodyUboBuffers_[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(BodyUBO);
+
+            VkWriteDescriptorSet write{};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = bodyDescriptorSets_[i];
+            write.dstBinding = 0;
+            write.dstArrayElement = 0;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            write.descriptorCount = 1;
+            write.pBufferInfo = &bufferInfo;
+
+            vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+        }
     }
 
     void createSyncObjects()
@@ -800,6 +1452,10 @@ class VulkanViewerApp
             vkDestroyFramebuffer(device_, framebuffer, nullptr);
         }
         framebuffers_.clear();
+        // Framebuffers reference the depth/color-msaa views, so both must be
+        // destroyed after them, not before.
+        cleanupDepthResources();
+        cleanupColorResources();
         vkbSwapchain_.destroy_image_views(swapchainImageViews_);
         swapchainImageViews_.clear();
     }
@@ -822,10 +1478,12 @@ class VulkanViewerApp
 
         cleanupSwapchain();
         createSwapchain();
-        // Framebuffers reference the old image views; render pass is unaffected
-        // since it doesn't depend on the swapchain's chosen format changing
-        // (safe assumption on this hardware/platform — a truly format-agnostic
-        // recreation would also recreate the render pass).
+        // The depth and MSAA color images are sized to the swapchain
+        // extent, so both need recreating alongside it. Render
+        // pass/pipelines are unaffected since neither format nor sample
+        // count changes across resize on this hardware/platform.
+        createDepthResources();
+        createColorResources();
         createFramebuffers();
         createRenderFinishedSemaphores();
     }
@@ -842,29 +1500,25 @@ class VulkanViewerApp
         vkDeviceWaitIdle(device_);
     }
 
-    glm::mat4 computeMvp()
+    // Fixed camera + projection, shared by every body and trail drawn this
+    // frame — real camera control (mouse orbit, zoom) is #74's job. Y-flip
+    // explained where it's applied: GLM assumes OpenGL's Y-up clip space;
+    // Vulkan's is Y-down.
+    void computeViewProj(glm::mat4& outView, glm::mat4& outProj, glm::vec3& outCameraPos)
     {
-        // Slow rotation stands in for real input/camera control, which is
-        // #74's job — this only exists to prove the MVP matrix is actually
-        // recomputed and pushed fresh every frame, not just uploaded once.
-        float time = static_cast<float>(glfwGetTime());
-        glm::mat4 model =
-            glm::rotate(glm::mat4(1.0f), time * glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        glm::vec3 cameraPos(0.0f, 1.5f, 4.0f);
-        glm::mat4 view = glm::lookAt(cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // Off-axis (not straight down the Z axis) so orbit depth/curvature
+        // and sphere shading actually read as 3D rather than a flat,
+        // symmetric top-down view.
+        outCameraPos = glm::vec3(6.0f, 5.5f, 9.0f);
+        outView = glm::lookAt(outCameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
         float aspect = static_cast<float>(swapchainExtent_.width) /
                        static_cast<float>(swapchainExtent_.height);
-        glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
-        // GLM was designed for OpenGL's clip space (Y up, matching the
-        // triangle-vertex convention from #71 that Vulkan itself does NOT
-        // follow — Vulkan's is Y down). This is the standard fix: flip the
-        // single matrix entry that controls clip-space Y scale, rather than
-        // hand-writing a Vulkan-specific projection matrix from scratch.
-        proj[1][1] *= -1.0f;
-
-        return proj * view * model;
+        // Wider than a typical 45° default — lets the fixed camera sit
+        // close enough to give bodies a visible angular size (see the radii
+        // comment above) while still framing the whole orbit.
+        outProj = glm::perspective(glm::radians(55.0f), aspect, 0.1f, 100.0f);
+        outProj[1][1] *= -1.0f;
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -876,7 +1530,17 @@ class VulkanViewerApp
             throw std::runtime_error("failed to begin recording command buffer");
         }
 
-        VkClearValue clearColor{{{0.05f, 0.07f, 0.12f, 1.0f}}};
+        // Index order must match the render pass's attachment order (color-
+        // msaa, depth-msaa, color-resolve). clearValues[2] is never actually
+        // used — the resolve attachment's loadOp is DONT_CARE, since the
+        // resolve step overwrites it completely — but Vulkan still requires
+        // clearValueCount to match attachmentCount, so a slot must exist.
+        std::array<VkClearValue, 3> clearValues{};
+        clearValues[0].color = {{0.05f, 0.07f, 0.12f, 1.0f}};
+        // 1.0 = the far plane in Vulkan's default [0, 1] depth range — start
+        // every pixel as "as far away as possible" so the first real
+        // fragment drawn at that pixel always passes the LESS depth test.
+        clearValues[1].depthStencil = {1.0f, 0};
 
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -884,14 +1548,12 @@ class VulkanViewerApp
         renderPassInfo.framebuffer = framebuffers_[imageIndex];
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapchainExtent_;
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
-
-        // Viewport/scissor were declared dynamic in the pipeline, so they
+        // Viewport/scissor were declared dynamic in both pipelines, so they
         // must be set here, every frame, using the current swapchain extent
         // (which changes across recreateSwapchain() on resize).
         VkViewport viewport{};
@@ -908,16 +1570,91 @@ class VulkanViewerApp
         scissor.extent = swapchainExtent_;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+        float t = static_cast<float>(glfwGetTime());
+        glm::mat4 view, proj;
+        glm::vec3 cameraPos;
+        computeViewProj(view, proj, cameraPos);
+        glm::mat4 vp = proj * view;
+        glm::vec3 sunWorldPos = bodies_[0].positionFn(t);
+
+        // ---- Pass 1: orbit trails (line-strip pipeline) ----
+        //
+        // Drawing trails before spheres or after makes no visual difference
+        // here — both pipelines test *and write* depth, so final visibility
+        // is resolved correctly regardless of draw order (only overdraw
+        // performance would differ, irrelevant at this scale).
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, orbitPipeline_);
+        for (const auto& body : bodies_)
+        {
+            if (body.trailPointCount < 2)
+            {
+                continue;
+            }
+
+            // Reveal a growing prefix of the precomputed trail as t advances,
+            // capping at the full length once t passes kTrailDuration —
+            // this is the entire "growth" mechanism; the buffer itself was
+            // uploaded once, in createBodies().
+            float progress = std::min(t / kTrailDuration, 1.0f);
+            uint32_t visibleCount =
+                1 + static_cast<uint32_t>(progress * static_cast<float>(body.trailPointCount - 1));
+            if (visibleCount < 2)
+            {
+                continue;
+            }
+
+            OrbitPushConstants orbitPc{vp, glm::vec4(body.color, 0.0f)};
+            vkCmdPushConstants(commandBuffer, orbitPipelineLayout_,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(OrbitPushConstants), &orbitPc);
+
+            VkBuffer trailBuffers[] = {body.trailBuffer};
+            VkDeviceSize trailOffsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, trailBuffers, trailOffsets);
+            vkCmdDraw(commandBuffer, visibleCount, 1, 0, 0);
+        }
+
+        // ---- Pass 2: lit spheres (triangle-list pipeline) ----
+        //
+        // The sphere mesh is identical for every body (only push
+        // constants/descriptor set differ per body), so bind it once outside
+        // the loop rather than redundantly per body.
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spherePipeline_);
         VkBuffer vertexBuffers[] = {vertexBuffer_};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
 
-        PushConstants pushConstants{computeMvp()};
-        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(PushConstants), &pushConstants);
+        for (size_t i = 0; i < bodies_.size(); ++i)
+        {
+            const RenderBody& body = bodies_[i];
+            glm::vec3 worldPos = body.positionFn(t);
 
-        vkCmdDrawIndexed(commandBuffer, sphereIndexCount_, 1, 0, 0, 0);
+            glm::mat4 model =
+                glm::scale(glm::translate(glm::mat4(1.0f), worldPos), glm::vec3(body.radius));
+            glm::mat4 mvp = vp * model;
+
+            // Rewrite this body's UBO for *this* frame-in-flight slot before
+            // binding its descriptor set — safe because the fence wait at
+            // the top of drawFrame() guarantees the GPU is done with
+            // whatever this slot's descriptor set pointed at last time this
+            // same slot was used.
+            size_t uboIndex = i * kMaxFramesInFlight + currentFrame_;
+            float isEmissive =
+                (i == 0) ? 1.0f : 0.0f; // body 0 is always the Sun (see createBodies())
+            BodyUBO ubo{body.color, sunWorldPos, glm::vec4(cameraPos, isEmissive)};
+            std::memcpy(bodyUboMapped_[uboIndex], &ubo, sizeof(BodyUBO));
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    spherePipelineLayout_, 0, 1, &bodyDescriptorSets_[uboIndex], 0,
+                                    nullptr);
+
+            SpherePushConstants spherePc{mvp, glm::vec4(worldPos, body.radius)};
+            vkCmdPushConstants(commandBuffer, spherePipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                               sizeof(SpherePushConstants), &spherePc);
+
+            vkCmdDrawIndexed(commandBuffer, sphereIndexCount_, 1, 0, 0, 0);
+        }
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -930,7 +1667,8 @@ class VulkanViewerApp
     void drawFrame()
     {
         // Wait for this frame-in-flight slot's previous submission to finish
-        // before reusing its command buffer.
+        // before reusing its command buffer (and, this milestone, its
+        // per-body UBOs/descriptor sets).
         vkWaitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
@@ -1014,17 +1752,38 @@ class VulkanViewerApp
         cleanupSwapchain();
         vkb::destroy_swapchain(vkbSwapchain_);
 
-        // renderFinishedSemaphores_ is already destroyed above, inside
-        // cleanupSwapchain() -> destroyRenderFinishedSemaphores().
+        // renderFinishedSemaphores_/depth resources are already destroyed
+        // above, inside cleanupSwapchain().
         for (int i = 0; i < kMaxFramesInFlight; ++i)
         {
             vkDestroySemaphore(device_, imageAvailableSemaphores_[i], nullptr);
             vkDestroyFence(device_, inFlightFences_[i], nullptr);
         }
         vkDestroyCommandPool(device_, commandPool_, nullptr);
-        vkDestroyPipeline(device_, graphicsPipeline_, nullptr);
-        vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
+
+        vkDestroyPipeline(device_, orbitPipeline_, nullptr);
+        vkDestroyPipelineLayout(device_, orbitPipelineLayout_, nullptr);
+        vkDestroyPipeline(device_, spherePipeline_, nullptr);
+        vkDestroyPipelineLayout(device_, spherePipelineLayout_, nullptr);
         vkDestroyRenderPass(device_, renderPass_, nullptr);
+
+        // Descriptor pool destruction implicitly frees every descriptor set
+        // allocated from it — no need to free bodyDescriptorSets_ one by one.
+        vkDestroyDescriptorPool(device_, descriptorPool_, nullptr);
+        vkDestroyDescriptorSetLayout(device_, descriptorSetLayout_, nullptr);
+
+        for (size_t i = 0; i < bodyUboBuffers_.size(); ++i)
+        {
+            vmaDestroyBuffer(allocator_, bodyUboBuffers_[i], bodyUboAllocations_[i]);
+        }
+
+        for (auto& body : bodies_)
+        {
+            if (body.trailBuffer != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(allocator_, body.trailBuffer, body.trailBufferAllocation);
+            }
+        }
 
         // Buffers must be destroyed before the allocator that owns their
         // underlying memory.
@@ -1056,6 +1815,7 @@ class VulkanViewerApp
     VkQueue graphicsQueue_ = VK_NULL_HANDLE;
     VkQueue presentQueue_ = VK_NULL_HANDLE;
     uint32_t graphicsQueueFamily_ = 0;
+    VkSampleCountFlagBits msaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
 
     vkb::Swapchain vkbSwapchain_;
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
@@ -1064,9 +1824,23 @@ class VulkanViewerApp
     std::vector<VkImageView> swapchainImageViews_;
     std::vector<VkFramebuffer> framebuffers_;
 
+    VkFormat depthFormat_ = VK_FORMAT_UNDEFINED;
+    VkImage depthImage_ = VK_NULL_HANDLE;
+    VmaAllocation depthImageAllocation_ = VK_NULL_HANDLE;
+    VkImageView depthImageView_ = VK_NULL_HANDLE;
+
+    VkImage colorImage_ = VK_NULL_HANDLE;
+    VmaAllocation colorImageAllocation_ = VK_NULL_HANDLE;
+    VkImageView colorImageView_ = VK_NULL_HANDLE;
+
     VkRenderPass renderPass_ = VK_NULL_HANDLE;
-    VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-    VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
+
+    VkPipelineLayout spherePipelineLayout_ = VK_NULL_HANDLE;
+    VkPipeline spherePipeline_ = VK_NULL_HANDLE;
+    VkPipelineLayout orbitPipelineLayout_ = VK_NULL_HANDLE;
+    VkPipeline orbitPipeline_ = VK_NULL_HANDLE;
+
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
 
@@ -1076,6 +1850,14 @@ class VulkanViewerApp
     VkBuffer indexBuffer_ = VK_NULL_HANDLE;
     VmaAllocation indexBufferAllocation_ = VK_NULL_HANDLE;
     uint32_t sphereIndexCount_ = 0;
+
+    std::vector<RenderBody> bodies_;
+
+    VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
+    std::vector<VkBuffer> bodyUboBuffers_;
+    std::vector<VmaAllocation> bodyUboAllocations_;
+    std::vector<void*> bodyUboMapped_;
+    std::vector<VkDescriptorSet> bodyDescriptorSets_;
 
     std::vector<VkSemaphore> imageAvailableSemaphores_;
     std::vector<VkSemaphore> renderFinishedSemaphores_;

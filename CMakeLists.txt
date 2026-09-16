@@ -178,6 +178,8 @@ file(MAKE_DIRECTORY ${ORBIT_VK_SPV_DIR})
 set(ORBIT_VK_SHADER_SOURCES
     ${ORBIT_VK_SHADER_DIR}/sphere.vert
     ${ORBIT_VK_SHADER_DIR}/sphere.frag
+    ${ORBIT_VK_SHADER_DIR}/orbit.vert
+    ${ORBIT_VK_SHADER_DIR}/orbit.frag
 )
 set(ORBIT_VK_SHADER_SPVS "")
 foreach(shader_src ${ORBIT_VK_SHADER_SOURCES})
