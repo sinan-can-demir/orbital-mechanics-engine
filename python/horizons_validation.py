@@ -21,9 +21,7 @@ Requirements:
 """
 
 import subprocess
-import os
 import sys
-import json
 import math
 import pandas as pd
 from pathlib import Path
@@ -34,7 +32,6 @@ REPO_ROOT  = Path(__file__).resolve().parent.parent
 SIM_EXE    = REPO_ROOT / "build/bin/orbit-sim"
 SYSTEM     = REPO_ROOT / "systems/earth_moon_horizons_2025.json"
 RESULTS    = REPO_ROOT / "results/horizons_validation"
-HORIZONS_PARSER = REPO_ROOT / "src/io/horizons_parser.cpp"  # just for reference
 
 EPOCH      = "2025-01-01"
 EPOCH_DT   = datetime(2025, 1, 1)
@@ -42,7 +39,6 @@ EPOCH_DT   = datetime(2025, 1, 1)
 # ── Study parameters ──────────────────────────────────────────────────────────
 DURATIONS_DAYS = [7, 30, 180]
 DT_SECONDS     = 60.0       # timestep
-STRIDE         = 1440       # write once per simulated day (1440 min/day)
 
 # HORIZONS body IDs we care about
 BODIES = {
