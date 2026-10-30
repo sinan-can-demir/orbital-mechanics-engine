@@ -239,96 +239,32 @@ target_link_libraries(orbit-sim PRIVATE
 )
 
 # ── Tests ────────────────────────────────────────────────────────────────────
-add_executable(test_conservation tests/test_conservation.cpp)
-
-target_link_libraries(test_conservation PRIVATE orbit_core)
-
-target_include_directories(test_conservation PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-)
-
-add_executable(test_horizons_parser tests/test_horizons_parser.cpp)
-
-target_link_libraries(test_horizons_parser PRIVATE orbit_core)
-
-target_include_directories(test_horizons_parser PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-)
-
-add_executable(test_system_writer tests/test_system_writer.cpp)
-
-target_link_libraries(test_system_writer PRIVATE orbit_core)
-
-target_include_directories(test_system_writer PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-)
-
 enable_testing()
 
-# ── Register existing tests ──────────────────────────────────────────────────
-add_test(NAME conservation
-    COMMAND test_conservation
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+# add_orbit_test(<ctest name> <source stem> [WORKDIR <dir>])
+#   Builds test_<stem> from tests/test_<stem>.cpp, links orbit_core, and registers it
+#   with ctest under <ctest name>. Tests run from the source dir unless WORKDIR is given.
+function(add_orbit_test name stem)
+    cmake_parse_arguments(ARG "" "WORKDIR" "" ${ARGN})
+    if (NOT ARG_WORKDIR)
+        set(ARG_WORKDIR ${CMAKE_SOURCE_DIR})
+    endif()
+    add_executable(test_${stem} tests/test_${stem}.cpp)
+    target_link_libraries(test_${stem} PRIVATE orbit_core)
+    target_include_directories(test_${stem} PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    add_test(NAME ${name} COMMAND test_${stem} WORKING_DIRECTORY ${ARG_WORKDIR})
+endfunction()
 
-add_test(NAME horizons_parser
-    COMMAND test_horizons_parser
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_test(NAME system_writer
-    COMMAND test_system_writer
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-# ── New test executables ─────────────────────────────────────────────────────
-add_executable(test_two_body tests/test_two_body.cpp)
-target_link_libraries(test_two_body PRIVATE orbit_core)
-target_include_directories(test_two_body PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME two_body
-    COMMAND test_two_body
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_executable(test_barycenter tests/test_barycenter.cpp)
-target_link_libraries(test_barycenter PRIVATE orbit_core)
-target_include_directories(test_barycenter PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME barycenter
-    COMMAND test_barycenter
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_executable(test_leapfrog tests/test_leapfrog.cpp)
-target_link_libraries(test_leapfrog PRIVATE orbit_core)
-target_include_directories(test_leapfrog PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME leapfrog
-    COMMAND test_leapfrog
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_executable(test_yoshida4 tests/test_yoshida4.cpp)
-target_link_libraries(test_yoshida4 PRIVATE orbit_core)
-target_include_directories(test_yoshida4 PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME yoshida4
-    COMMAND test_yoshida4
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_executable(test_hermite tests/test_hermite.cpp)
-target_link_libraries(test_hermite PRIVATE orbit_core)
-target_include_directories(test_hermite PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME hermite
-    COMMAND test_hermite
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
-add_executable(test_cli tests/test_cli.cpp)
-target_link_libraries(test_cli PRIVATE orbit_core)
-target_include_directories(test_cli PRIVATE ${PROJECT_SOURCE_DIR}/include)
-add_test(NAME cli_smoke
-    COMMAND test_cli
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
+add_orbit_test(conservation    conservation)
+add_orbit_test(horizons_parser horizons_parser)
+add_orbit_test(system_writer   system_writer)
+add_orbit_test(two_body        two_body)
+add_orbit_test(barycenter      barycenter)
+add_orbit_test(leapfrog        leapfrog)
+add_orbit_test(yoshida4        yoshida4)
+add_orbit_test(hermite         hermite)
+add_orbit_test(golden          golden)
+add_orbit_test(cli_smoke       cli WORKDIR ${CMAKE_BINARY_DIR})
 
 # ------------------------------------------------------------
 # orbit (Python module)
