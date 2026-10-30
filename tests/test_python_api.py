@@ -84,3 +84,39 @@ def test_simulate_adaptive_rejects_non_positive_dt_min():
     with pytest.raises(ValueError, match='dt_min'):
         orbit.simulate_adaptive('systems/earth_moon.json', duration_s=3600.0,
                                  dt_initial=100.0, dt_min=0.0, dt_max=100.0)
+
+
+# ── Cross-check against the C++ golden values (tests/golden/values.txt) ───────
+# The same scenarios are run by tests/test_golden.cpp; the bindings must agree with
+# the engine on every integrator, not just the default RK4.
+
+def _golden():
+    values = {}
+    with open('tests/golden/values.txt') as f:
+        for line in f:
+            key, val = line.split()
+            values[key] = float(val)
+    return values
+
+@pytest.mark.parametrize('name, integrator', [
+    ('rk4', 'RK4'),
+    ('leapfrog', 'Leapfrog'),
+    ('yoshida4', 'Yoshida4'),
+    ('hermite', 'Hermite'),
+])
+def test_fixed_step_integrators_match_cpp_golden(name, integrator):
+    golden = _golden()
+    result = orbit.simulate('systems/earth_moon.json', steps=1000, dt=3600.0,
+                             integrator=getattr(orbit.Integrator, integrator), stride=100)
+    E = result.energies_numpy()
+    assert len(E) == golden[f'{name}.n_snapshots']
+    assert E[-1] == pytest.approx(golden[f'{name}.last.E'], rel=1e-9)
+
+def test_simulate_adaptive_matches_cpp_golden():
+    golden = _golden()
+    result = orbit.simulate_adaptive('systems/earth_moon.json', duration_s=30 * 86400.0,
+                                      dt_initial=3600.0, output_interval_s=86400.0)
+    E = result.energies_numpy()
+    assert len(E) == golden['rk45.n_snapshots']
+    assert E[-1] == pytest.approx(golden['rk45.last.E'], rel=1e-9)
+    assert result.positions_numpy().shape == (len(E), 3, 3)
