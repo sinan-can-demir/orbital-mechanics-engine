@@ -9,7 +9,7 @@ import rebound
 import orbit
 import numpy as np
 
-G = 6.674e-11
+G = 6.67430e-11
 YEAR = 365.25 * 24 * 3600
 SYSTEM = "systems/solar_system.json"
 

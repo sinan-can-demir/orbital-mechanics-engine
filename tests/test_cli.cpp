@@ -149,6 +149,23 @@ int main()
     std::cout << "PASS: --dt -1 is rejected instead of silently defaulted\n";
     std::filesystem::remove("/tmp/test_cli_neg1.csv");
 
+    // ── Test 9: `run --help` prints only the run help ──────────────────────
+    // Regression test: the "run" branch of printCommandHelp used to fall through
+    // and also print "No help available for command: run".
+    ret = std::system("./bin/orbit-sim run --help 2>&1 | grep -q 'No help available'");
+    if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
+    {
+        std::cerr << "FAIL: `run --help` printed \"No help available\"\n";
+        return 1;
+    }
+    ret = std::system("./bin/orbit-sim run --help 2>&1 | grep -q hermite");
+    if (!WIFEXITED(ret) || WEXITSTATUS(ret) != 0)
+    {
+        std::cerr << "FAIL: `run --help` does not list the hermite integrator\n";
+        return 1;
+    }
+    std::cout << "PASS: run --help is complete and has no fall-through message\n";
+
     std::cout << "PASS: all CLI smoke tests passed\n";
     return 0;
 }
