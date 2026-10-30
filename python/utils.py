@@ -1,15 +1,11 @@
 """
-File: energy_conservation.py
-Author: Sinan Demir
-Date: 11/17/2025
-Purpose: Utility functions for data analysis
-
-    pick_csv: a helper for file picking
-"""
-"""
 utils.py
 --------
 Shared utilities for orbital mechanics plotting scripts.
+Author: Sinan Demir
+Date: 11/17/2025
+
+    pick_csv: a helper for file picking
 """
 
 import glob

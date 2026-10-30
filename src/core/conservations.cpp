@@ -26,24 +26,6 @@ static inline double distance(const CelestialBody& a, const CelestialBody& b)
     return (a.position - b.position).length();
 }
 
-// ---- helper: r × (m v) ---- //
-static inline std::array<double, 3> angular_term(const CelestialBody& b)
-{
-    /*****************
-     * Computes angular momentum term r × (m v) for a body
-     * @param: b - celestial body
-     * @return: 3D vector of angular momentum contribution
-     * @exception: none
-     * @note: uses std::array from <array> and vec3 cross product
-     *****************/
-    // m v
-    vec3 p = b.mass * b.velocity;
-    // r × (m v)
-    vec3 L = cross(b.position, p);
-
-    return {L.x(), L.y(), L.z()};
-}
-
 /***********************
  * compute (N-body overload)
  * @brief: Computes conservation laws for an arbitrary N-body system.

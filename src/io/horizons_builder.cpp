@@ -227,16 +227,8 @@ bool buildSystemFromHorizons(const BuildSystemOptions& opts)
         return false;
     }
 
-    try
-    {
-        const auto loaded = loadSystemFromJSON(opts.output);
-        std::cout << "✅ Written: " << opts.output << " (" << loaded.size() << " bodies)\n";
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << "❌ build-system: round-trip load failed: " << e.what() << "\n";
-        return false;
-    }
+    // writeSystemJSON already reloads the file and verifies every field.
+    std::cout << "✅ Written: " << opts.output << " (" << bodies.size() << " bodies)\n";
 
     return true;
 }

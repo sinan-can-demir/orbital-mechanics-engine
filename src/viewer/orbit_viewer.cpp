@@ -1027,16 +1027,12 @@ int main(int argc, char** argv)
 
                 body.mesh.draw();
             }
-            buildOrbitBuffers();
         }
 
         // ------------------------------------------------
         // HUD legend (Sun / Earth / Moon) – top-left
         // ------------------------------------------------
         glDisable(GL_DEPTH_TEST);
-
-        float size = LEGEND_SIZE_PX;
-        float sizeSel = LEGEND_SIZE_PX * 1.4f; // highlight selected
 
         for (size_t i = 0; i < g_bodies.size(); ++i)
         {

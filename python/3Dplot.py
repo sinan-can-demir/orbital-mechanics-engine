@@ -66,12 +66,6 @@ ax.scatter(df["x_sun"].iloc[0],
 
 ax.legend()
 
-# --- Set 3D bounds (roughly around Earth's orbit) ---
-R = 1.6e11  # a bit larger than Earth's orbital radius
-ax.set_xlim(-R, R)
-ax.set_ylim(-R, R)
-ax.set_zlim(-R / 6, R / 6)  # z is much smaller than x,y
-
 # --- Set correct axis limits before equalizing ---
 R = 1.6e11    # Earth orbit scale
 ZMAX = 3.5e7  # maximum moon inclination (~35,000 km)

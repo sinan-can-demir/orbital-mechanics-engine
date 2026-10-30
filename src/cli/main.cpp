@@ -11,8 +11,17 @@
  *      - Fetching raw ephemeris from NASA HORIZONS
  *********************/
 
-#include "main.h"
+#include "barycenter.h"
+#include "cli.h"
+#include "horizons.h"
+#include "horizons_builder.h"
+#include "json_loader.h"
+#include "simulation.h"
+#include "validate.h"
+#include <filesystem>
+#include <iostream>
 #include <sstream>
+#include <string>
 
 namespace
 {
