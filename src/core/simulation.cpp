@@ -100,21 +100,6 @@ void applyGRCorrection(std::vector<CelestialBody>& bodies)
 }
 
 /***********************
- * eulerStep
- * @brief: Simple Euler integration step (unused in main loop but kept for
- * reference).
- * @param: body - CelestialBody reference
- * @param: dt   - time step
- * @exception none
- * @return none
- ***********************/
-void eulerStep(CelestialBody& body, double dt)
-{
-    body.velocity += body.acceleration * dt;
-    body.position += body.velocity * dt;
-}
-
-/***********************
  * resetAccelerations
  * @brief: Sets acceleration vectors to zero for every body in the collection.
  ***********************/
@@ -390,32 +375,6 @@ void hermiteStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr)
     }
 
     updateAccelerations(bodies, use_gr); // leave acceleration current for next call
-}
-
-/********************
- * detectSEM
- * @brief: Detects indices of Sun, Earth, and Moon in the bodies vector.
- * @param bodies   - vector of CelestialBody objects
- * @param idxSun   - output index of Sun
- * @param idxEarth - output index of Earth
- * @param idxMoon  - output index of Moon
- * @return true if all three bodies are found, false otherwise
- *********************/
-bool detectSEM(const std::vector<CelestialBody>& bodies, int& idxSun, int& idxEarth, int& idxMoon)
-{
-    idxSun = idxEarth = idxMoon = -1;
-
-    for (int i = 0; i < (int)bodies.size(); i++)
-    {
-        if (bodies[i].name == "Sun")
-            idxSun = i;
-        if (bodies[i].name == "Earth")
-            idxEarth = i;
-        if (bodies[i].name == "Moon")
-            idxMoon = i;
-    }
-
-    return (idxSun >= 0 && idxEarth >= 0 && idxMoon >= 0);
 }
 
 ConservationSnapshot computeSnapshot(const physics::Conservations& C, double E0, double L0,

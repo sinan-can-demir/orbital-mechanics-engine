@@ -26,7 +26,6 @@ enum class Integrator
     RK4,
     Leapfrog,
     RK45,
-    euler,
     Yoshida4,
     Hermite,
 };
@@ -40,7 +39,6 @@ struct StateDerivative
 };
 
 // ── Core force / acceleration ─────────────────────────────────────────────────
-void computeAcceleration(CelestialBody& earth, const CelestialBody& sun);
 void computeGravitationalForce(CelestialBody& a, CelestialBody& b);
 // Schwarzschild 1PN correction: Δa = (GM/c²r³)[(4GM/r − v²)r + 4(r·v)v]
 // Applied after Newtonian forces. Treats the most massive body as the central attractor.
@@ -112,7 +110,6 @@ SimulationResult runSimulationAdaptiveCore(std::vector<CelestialBody>& bodies, d
                                            bool use_gr = false);
 
 // ── Fixed-step integrators ────────────────────────────────────────────────────
-void eulerStep(CelestialBody& body, double dt);
 void rk4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
 void leapfrogStep(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);
 void yoshida4Step(std::vector<CelestialBody>& bodies, double dt, bool use_gr = false);

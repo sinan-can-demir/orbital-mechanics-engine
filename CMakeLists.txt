@@ -124,7 +124,6 @@ if (BUILD_VIEWER)
 
 add_executable(orbit-viewer
     src/viewer/orbit_viewer.cpp
-    src/viewer/csv_loader.cpp
     src/viewer/sphere_mesh.cpp
 )
 
@@ -152,12 +151,6 @@ else()
         glm::glm
     )
 endif()
-
-# CSVLoader has no OpenGL/GLFW dependency, so it can be tested standalone
-# without spinning up a display.
-add_executable(test_csv_loader tests/test_csv_loader.cpp src/viewer/csv_loader.cpp)
-target_include_directories(test_csv_loader PRIVATE ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(test_csv_loader PRIVATE glm::glm)
 
 endif()  # BUILD_VIEWER
 
@@ -336,13 +329,6 @@ add_test(NAME cli_smoke
     COMMAND test_cli
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-
-if (BUILD_VIEWER)
-add_test(NAME csv_loader
-    COMMAND test_csv_loader
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-endif()
 
 # ------------------------------------------------------------
 # orbit (Python module)
