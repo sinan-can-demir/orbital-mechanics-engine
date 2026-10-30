@@ -162,3 +162,8 @@ Each phase = one or more branches/PRs. Full `ctest` + `pytest` + `make format` b
 Done: VIEW-4, CLI-6 (+ `test_cli` Test 9), PY-7 (benchmark + notebooks 05/06 source), IO-3 Mercury, PY-1 `elif`; deleted CORE-8 items (`ray.h`, `main.h`, `computeAcceleration`, `eulerStep`, `Integrator::euler`, `angular_term`, `detectSEM`), VIEW-3, VIEW-1 (CSVLoader + test + CMake), PY-11, PY-6, IO-7.
 Left for later phases: `dp45` C2..C7 (documentation value, kept), IO-8 comment cleanup.
 Follow-up: notebooks 05/06 committed outputs are stale (computed with the old G); re-execute them.
+
+### Phase 2 status (2026-10-30, branch `refactor/phase2-test-infra`, stacked on phase 1)
+Done: `tests/test_helpers.h` (CHECK macros, `makeSunEarth`, `circularSpeed`, `maxEnergyDrift`, `nearlyEqual`, `TempDir`), `add_orbit_test()` CMake function (ctest names unchanged), TEST-5 (Kepler check now compares the simulated swept angle), `test_golden` (integrators, RK45, `SimulationResult` fields, fixed + adaptive CSV; `GOLDEN_STRICT=1` for bit-identity), Python cross-check against the golden values, README refresh.
+Verified: reordering the Yoshida4 kick operations is caught by `GOLDEN_STRICT=1` (6 mismatches) and passes the default tolerances.
+Not yet done (carry into the phase that needs them): `runCmd` + `TempDir` in `test_cli.cpp` and the CMake-provided exe paths (TEST-6), `TempFile` use in `test_horizons_parser`/`test_system_writer` (TEST-7), `test_leapfrog` still hand-rolled, `test_conservation`/`test_barycenter` not yet on the shared helpers. Tests for `parseIntegrator`, `resolveSimParams`, `normalizeHorizonsTime`, the viewer CSV parser and `generateUVSphere` are added in the phase that introduces each function.
