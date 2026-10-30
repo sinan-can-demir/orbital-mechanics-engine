@@ -5,6 +5,7 @@
 //      information instead of extra stage evaluations, so it isn't a huge margin)
 #include "simulation.h"
 #include "conservations.h"
+#include "test_helpers.h"
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -15,14 +16,6 @@ struct CircularOrbit
 {
     double r, v, n; // radius, speed, angular velocity
 };
-
-std::vector<CelestialBody> makeSunEarth(double r, double v)
-{
-    return {
-        CelestialBody("Sun", 1.98847e30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-        CelestialBody("Earth", 5.9722e24, r, 0.0, 0.0, 0.0, v, 0.0),
-    };
-}
 
 // Compares the Sun->Earth SEPARATION vector against the analytic circle, not Earth's
 // absolute position. These initial conditions give the system nonzero net momentum
@@ -42,7 +35,7 @@ double positionError(const std::vector<CelestialBody>& bodies, const CircularOrb
 double runHermite(const CircularOrbit& orbit, double totalTime, int steps)
 {
     double dt = totalTime / steps;
-    auto bodies = makeSunEarth(orbit.r, orbit.v);
+    auto bodies = testing::makeSunEarth(orbit.r, orbit.v);
     updateAccelerations(bodies); // required before first Hermite step
     for (int i = 0; i < steps; ++i)
         hermiteStep(bodies, dt);
@@ -52,7 +45,7 @@ double runHermite(const CircularOrbit& orbit, double totalTime, int steps)
 double runRK4(const CircularOrbit& orbit, double totalTime, int steps)
 {
     double dt = totalTime / steps;
-    auto bodies = makeSunEarth(orbit.r, orbit.v);
+    auto bodies = testing::makeSunEarth(orbit.r, orbit.v);
     for (int i = 0; i < steps; ++i)
         rk4Step(bodies, dt);
     return positionError(bodies, orbit, totalTime);
@@ -61,13 +54,12 @@ double runRK4(const CircularOrbit& orbit, double totalTime, int steps)
 
 int main()
 {
-    const double G = 6.67430e-11;
-    const double M_SUN = 1.98847e30;
-    const double M_EARTH = 5.9722e24;
-    const double r = 1.496e11;
+    const double M_SUN = testing::kMSun;
+    const double M_EARTH = testing::kMEarth;
+    const double r = testing::kEarthSunR;
     // Circular relative orbit for a genuine two-body problem uses the TOTAL mass, not
     // just the Sun's — the relative separation vector obeys G*(M1+M2), not G*M1.
-    const double v = std::sqrt(G * (M_SUN + M_EARTH) / r);
+    const double v = testing::circularSpeed(M_SUN + M_EARTH, r);
     const double n = v / r;
 
     CircularOrbit orbit{r, v, n};

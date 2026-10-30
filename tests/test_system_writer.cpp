@@ -1,5 +1,6 @@
 #include "json_loader.h"
 #include "system_writer.h"
+#include "test_helpers.h"
 
 #include <algorithm>
 #include <cmath>
@@ -7,18 +8,7 @@
 #include <iostream>
 #include <vector>
 
-namespace
-{
-bool nearlyEqual(double a, double b, double absTol = 1e-9, double relTol = 1e-12)
-{
-    const double diff = std::abs(a - b);
-    if (diff <= absTol)
-    {
-        return true;
-    }
-    return diff <= relTol * std::max(std::abs(a), std::abs(b));
-}
-} // namespace
+using testing::nearlyEqual;
 
 int main()
 {
