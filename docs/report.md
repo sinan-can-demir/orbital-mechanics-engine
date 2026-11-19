@@ -54,6 +54,11 @@ vector — it was never wired into the N-body dispatch loop. The adaptive
 
 ### 2. G constant inconsistency between C++ engine and SPICE IC builder
 
+> **Status: resolved.** Code fixed in `9b06bd0` (#26); the generated `systems/solar_system_spice.json`
+> (which still carried masses from G = 6.674e-11) was regenerated 2026-11-18 in `20c7804`, and
+> `tests/test_spice_constants.py` now guards it. Since `fe3a922`, Python reads G from `orbit.G`.
+> The 88,126 km Earth error that the SPICE notebook blamed on GR/J2 was this mismatch; see `docs/validation.md`.
+
 | File | Value |
 |------|-------|
 | `include/utils.h:14` | `6.67430e-11` |
@@ -254,6 +259,10 @@ system with differently named bodies (e.g., "Sol" instead of "Sun").
 ---
 
 ### 12. `utils.h` is misnamed, mostly dead, and has wrong values
+
+> **Status: resolved.** Renamed to `include/constants.h` and the dead constants removed in `9b06bd0` (#26).
+> On 2026-11-18 (`d5f1ee2`) `AU`, `GM_SUN` and `M_SUN` were added back deliberately, with sources, as the
+> reference values for system files (see `docs/constants.md`). The text below describes the file as audited on 2026-06-12.
 
 The file is named `utils.h` but contains only physical constants — it should be `constants.h`.
 The namespace encapsulation (`physics::constants`) is already in place and correct.

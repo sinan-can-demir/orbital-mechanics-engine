@@ -33,7 +33,7 @@ GREEN            := \033[0;32m
 YELLOW           := \033[0;33m
 NC               := \033[0m
 
-.PHONY: all build build-sim build-viewer clean reconfigure help
+.PHONY: drift-check all build build-sim build-viewer clean reconfigure help
 .PHONY: run run-earth-moon run-solar-system view fetch validate validate-earth-moon test
 .PHONY: plot plot-energy plot-momentum plot-3d plot-3d-exaggerated plot-3d-earth-moon
 .PHONY: build-earth-moon build-solar-system pipeline-earth-moon
@@ -203,7 +203,10 @@ python-install:
 
 python-test:
 	@echo -e "$(BLUE)Running Python API tests...$(NC)"
-	pytest tests/test_python_api.py -v
+	pytest tests/test_python_api.py tests/test_spice_constants.py -v
+
+drift-check:
+	python3 tools/check_drift.py
 
 python-check: python-install python-test
 	@echo -e "$(GREEN)Python bindings check complete.$(NC)"

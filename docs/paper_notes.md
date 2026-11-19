@@ -9,104 +9,123 @@ Pre-writing notes for paper.md (JOSS submission). Not a draft — just findings 
 | Phase | Status | Description |
 |---|---|---|
 | Python API (pybind11) | Done | `orbit.simulate()`, `simulate_adaptive()`, NumPy output |
-| Tests + CI | Done | 7 C++ tests, 4 Python tests, GitHub Actions |
-| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 6 notebooks |
+| Tests + CI | Done | 10 ctest tests, 22 pytest tests (counted 2026-11-18), GitHub Actions |
+| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 9 notebooks |
 | REBOUND comparison | Done | Notebooks 05 & 06, benchmark script |
-| **SPICE validation** | **Next** | Compare simulated vs real trajectories using NASA kernels |
-| paper.md + paper.bib | Pending | JOSS submission — blocked on SPICE results |
+| SPICE validation | Done | Compared against DE440; see below (rerun 2026-11-18) |
+| paper.md + paper.bib | In progress | JOSS submission |
 
 ---
 
-## SPICE validation results (✅ Done — Steps 1 + 1b)
+## SPICE validation results (rerun 2026-11-18 after constants fix)
+
+Full tables and method: `docs/validation.md` ("SPICE DE440 Validation Results"). Raw data:
+`results/spice_validation/error_1yr_current.csv` and `..._baseline_G6.674_masses.csv`;
+regenerate with `python3 python/spice_validation_table.py`.
 
 **Setup:** DE440-derived ICs (`systems/solar_system_spice.json`, built by `python/spice_ic.py`),
-ground truth from SPICE `spkgeo()` in ECLIPJ2000 frame. All four integrators, 10-body solar
-system, 1-year run from 2025-01-01.
+ground truth from SPICE `spkgeo()` in ECLIPJ2000 frame, positions relative to the Sun,
+10-body system, exactly one Julian year from 2025-01-01, dt = 1 h for fixed-step methods.
 
-**Bug found and fixed:** The fixed-step simulation loop saved snapshots labeled `i*dt` but
-containing the state AFTER step `i` (actual time `(i+1)*dt`). Fix: changed to `(i+1)*dt`.
-The adaptive (RK45) loop was already correct. Old notebook numbers were affected by this bug.
+**Correction:** earlier versions of these notes reported Earth at 88,126 km after one year and
+attributed it to "missing GR + J2". That was wrong. The system file's masses had been computed
+with G = 6.674e-11 while the engine uses 6.67430e-11. Regenerating the file removes the error.
 
-### Integrator comparison — Earth position error (SPICE ICs)
+### Earth error at 1 year (km)
 
-| Integrator | t=1h (km) | t=1yr (km) | Drift (km) |
+| Integrator | before: GR off | before: GR on | after: GR off | after: GR on |
+|---|---|---|---|---|
+| RK4 | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+| Leapfrog | 87,969.8 | 87,908.8 | 94.3 | 155.3 |
+| Yoshida4 | 88,125.0 | 88,063.9 | 61.1 | 0.1 |
+| Hermite | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+| RK45 tol=1e-9 | 88,125.1 | 88,064.2 | 61.2 | 0.3 |
+| RK45 tol=1e-12 | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+
+### Per-body errors at 1 year (RK4, dt = 1 h)
+
+| Body | before: GR off | after: GR off | after: GR on |
 |---|---|---|---|
-| RK4 (dt=1h) | 0 | 88,126 | 88,126 |
-| Leapfrog (dt=1h) | 0 | 87,970 | 87,970 |
-| RK45 (atol=1e-9) | 0 | 88,125 | 88,125 |
-| RK45 (atol=1e-12) | 0 | 88,125 | 88,125 |
-
-**Key finding:** All four integrators give identically ~88,000 km at 1 year. Tightening
-RK45 tolerance 1000× makes zero difference. Error is entirely **physics-dominated**
-(missing GR + J2), not numerical precision.
-
-### Per-body errors at 1 year (RK4, dt=1h, SPICE ICs)
-
-| Body | Error at 1yr (km) | % of orbital radius | Notes |
-|---|---|---|---|
-| Venus | 106,214 | 0.070% | Close orbit, GR strong |
-| Mercury | 95,099 | 0.210% | 43″/century GR precession |
-| Moon | 90,759 | — | Coupled to Earth |
-| Earth | 88,126 | 0.059% | |
-| Mars | 71,585 | 0.047% | Boundary of GR significance |
-| Jupiter | 5,246 | 0.001% | GR negligible at 5.2 AU |
-| Saturn | 1,450 | 0.0002% | |
-| Uranus | 353 | 0.00002% | |
-| Neptune | 149 | 0.000006% | |
-
-Sharp drop from Mars → Jupiter confirms inner-planet errors are GR-dominated.
+| Mercury | 95,027.3 | 88.1 | 0.1 |
+| Venus | 106,324.4 | 96.4 | 0.0 |
+| Earth | 88,125.0 | 61.1 | 0.2 |
+| Moon | 90,850.8 | 50.6 | 12.0 |
+| Mars | 71,683.6 | 31.1 | 0.2 |
+| Jupiter | 5,253.1 | 0.6 | 0.1 |
+| Saturn | 1,452.0 | 0.1 | 0.2 |
+| Uranus | 353.3 | 0.1 | 0.1 |
+| Neptune | 149.3 | 0.1 | 0.1 |
 
 ### Paper claim (defensible)
 
-> "Starting from DE440 initial conditions, our Newtonian simulator maintains Earth's position
-> to within 88,126 km (0.059% of orbital radius) over a one-year integration of the
-> full 10-body solar system. Tightening the adaptive integrator tolerance by 1000× produces
-> no change in this error, confirming the residual is dominated by missing post-Newtonian
-> corrections rather than numerical integration precision."
+> "Starting from DE440 initial conditions, the 10-body simulator with the first post-Newtonian
+> correction reproduces Earth's heliocentric position to 0.2-0.3 km and Mercury, Venus and Mars to 0.5 km
+> or better over one Julian year (RK4, Hermite and RK45 integrators);
+> without the correction Earth is 61 km off. The Moon remains 12 km off, which we have not explained."
+
+Leapfrog at dt = 1 h is worse (Mercury 4,432 km); this scales like dt^2 and is numerical.
+Yoshida4 with GR on is 17 km off for Mercury; cause not investigated.
 
 ---
 
----
+## Benchmark results (rerun 2026-11-18)
 
-## Benchmark results
+Solar system (10 bodies, `systems/solar_system.json`), 1 Julian year, Newtonian. Each timing repeated
+10 times; median, min-max and interquartile range reported. Produced by `python3 benchmark_rebound.py`
+(data: `results/paper_benchmark/benchmark_timing.csv`). The earlier Earth-Moon table and the single-run
+timings were replaced; they were not reproduced in this rerun.
 
-### Earth-Moon system (3 bodies), 1-year integration
+| Integrator | Median (ms) | Min-max (ms) | IQR (ms) | Steps (snapshots for RK45) | Energy drift |
+|---|---|---|---|---|---|
+| Ours: RK4 (dt=1h) | 100.6 | 98.8-105.9 | 2.6 | 8766 | 8.976e-15 |
+| Ours: Leapfrog (dt=1h) | 28.0 | 27.6-28.6 | 0.5 | 8766 | 2.211e-10 |
+| Ours: Yoshida4 (dt=1h) | 61.7 | 61.0-64.0 | 1.9 | 8766 | 8.415e-15 |
+| Ours: Hermite (dt=1h) | 90.2 | 89.8-102.9 | 1.4 | 8766 | 5.329e-14 |
+| Ours: RK45 (tol=1e-9) | 12.1 | 11.8-14.4 | 1.8 | 517 | 1.575e-11 |
+| Ours: RK45 (tol=1e-12) | 47.1 | 46.7-49.5 | 0.6 | 2123 | 2.169e-14 |
+| REBOUND: IAS15 (default) | 43.3 | 42.5-47.2 | 2.2 | 305 | 5.602e-16 |
+| REBOUND: WHFast (dt=1h) | 84.3 | 83.4-87.5 | 1.1 | 8766 | 2.639e-13 |
 
-| Integrator | Time (ms) | Steps | Energy drift |
+Timings are not matched for accuracy (IAS15 reaches the lowest drift). Repetition spread is small
+(IQR <= 2.6 ms) compared with the old "about 30% variability" note, which came from single runs.
+
+### Long-run energy drift (GR off, 10-body Solar System)
+
+Produced by `python3 python/long_run_energy_drift.py [--dt ...]`; figure
+`results/paper_benchmark/long_run_energy_drift.png`. Maximum |dE/E0| up to each time.
+
+dt = 1 h (`long_run_energy_drift_dt3600.csv`; wall times in that CSV were measured while other jobs ran, do not quote them):
+
+| Integrator | max drift to 10 yr | to 100 yr | to 1000 yr |
 |---|---|---|---|
-| Ours: RK4 (dt=1h) | 21.9 | 8,760 | 4.517e-15 |
-| Ours: Leapfrog (dt=1h) | 10.9 | 8,760 | 1.792e-11 |
-| Ours: RK45 (atol=1e-9) | 3.1 | 561 | 7.311e-12 |
-| Ours: RK45 (atol=1e-12) | 11.4 | 2,282 | 5.958e-14 |
-| REBOUND: IAS15 (default) | 12.7 | 305 | 0.000e+00 |
-| REBOUND: WHFast (dt=1h) | 22.6 | 8,766 | 1.181e-11 |
+| RK4 (dt=3600s) | 4.824e-14 | 4.824e-14 | 7.113e-13 |
+| Leapfrog (dt=3600s) | 3.739e-10 | 3.924e-10 | 3.931e-10 |
+| Yoshida4 (dt=3600s) | 7.237e-14 | 1.255e-13 | 4.688e-13 |
+| Hermite (dt=3600s) | 1.634e-13 | 2.248e-13 | 6.141e-13 |
+| RK45 (tol=1e-9) | 1.376e-10 | 1.471e-09 | 1.590e-08 |
 
-### Solar system (10 bodies), 1-year integration
+dt = 1 day (`long_run_energy_drift_dt86400.csv`):
 
-| Integrator | Time (ms) | Steps | Energy drift |
+| Integrator | max drift to 10 yr | to 100 yr | to 1000 yr |
 |---|---|---|---|
-| Ours: RK4 (dt=1h) | 103.3 | 8,760 | 3.553e-15 |
-| Ours: Leapfrog (dt=1h) | 31.2 | 8,760 | 2.186e-10 |
-| Ours: RK45 (atol=1e-9) | 13.3 | 517 | 1.576e-11 |
-| Ours: RK45 (atol=1e-12) | 51.5 | 2,122 | 1.758e-14 |
-| REBOUND: IAS15 (default) | 40.8 | 305 | 3.735e-16 |
-| REBOUND: WHFast (dt=1h) | 84.2 | 8,766 | 2.478e-13 |
-
-Run with: `python3 benchmark_rebound.py` (repo root). Single-run timing — variability ±~30%.
+| RK4 (dt=86400s) | 3.677e-08 | 3.345e-07 | 2.801e-06 |
+| Leapfrog (dt=86400s) | 2.059e-07 | 2.099e-07 | 2.099e-07 |
+| Yoshida4 (dt=86400s) | 2.469e-09 | 2.545e-09 | 2.562e-09 |
+| Hermite (dt=86400s) | 8.698e-09 | 8.676e-08 | 8.338e-07 |
 
 ---
 
 ## What these results actually support
 
 **Defensible claims:**
-- Our adaptive RK45 is ~3x faster than REBOUND IAS15 on the 10-body solar system for moderate-precision work (atol=1e-9: 13ms vs 41ms)
-- Our RK4 achieves better single-run energy drift than REBOUND WHFast for 1-year integrations (3.5e-15 vs 2.5e-13)
-- Integrator choice is a single argument — direct, transparent user control
+- At dt = 1 h, RK4, Yoshida4 and Hermite stay at 1e-13 level for 1000 years; Leapfrog is bounded near 3.9e-10; RK45 (tol 1e-9) drifts secularly (1.4e-10 at 10 yr, 1.6e-8 at 1000 yr).
+- At dt = 1 day, RK4 and Hermite drift secularly (2.8e-6 and 8.3e-7 at 1000 yr), Leapfrog (2.1e-7) and Yoshida4 (2.6e-9) stay bounded.
+- Integrator choice is a single argument.
 
 **Claims to avoid:**
-- Do not claim we beat REBOUND in accuracy. REBOUND IAS15 achieves near machine-precision (3.7e-16) — we don't match that
-- Do not claim the timing difference is statistically significant without multiple runs
-- WHFast result caveat: WHFast's bounded drift advantage over RK4 would appear over long timescales (>10 years); 1-year comparison favours RK4 unfairly
+- Do not claim we beat REBOUND in accuracy: IAS15 reaches 5.6e-16 after 1 year, our best is 8.4e-15 (Yoshida4).
+- Do not quote the RK45-vs-IAS15 timing ratio as a speed advantage; the runs are not accuracy-matched.
+- The 1-year comparison favours RK4 over symplectic methods; use the long-run table.
 
 ---
 
@@ -124,13 +143,13 @@ The paper should not position this as "better than REBOUND." The angle is: **tra
 
 ## Statement of Need (draft)
 
-Existing N-body simulators such as REBOUND prioritise maximum accuracy through opaque adaptive integrators. This is appropriate for research but makes them unsuitable for teaching the effects of numerical integration on orbital mechanics. Orbital Mechanics Engine exposes three integration methods — RK4, Leapfrog, and RK45 Dormand-Prince — through a single swappable argument, letting students directly observe and compare energy conservation, timestep behaviour, and long-term drift without modifying any simulation code.
+Existing N-body simulators such as REBOUND prioritise maximum accuracy through opaque adaptive integrators. This is appropriate for research but makes them unsuitable for teaching the effects of numerical integration on orbital mechanics. Orbital Mechanics Engine exposes five integration methods — RK4, Leapfrog, Yoshida4, RK45 Dormand-Prince and Hermite — through a single swappable argument, letting students directly observe and compare energy conservation, timestep behaviour, and long-term drift without modifying any simulation code.
 
 ---
 
 ## Key features for paper
 
-- Three integrators: RK4 (4th order, fixed), Leapfrog (2nd order symplectic, fixed), RK45 Dormand-Prince (adaptive)
+- Five integrators: RK4 (4th order, fixed), Leapfrog (2nd order symplectic, fixed), Yoshida4 (4th order symplectic, fixed), RK45 Dormand-Prince (adaptive), Hermite (4th order predictor-corrector, fixed)
 - NASA JPL HORIZONS integration — real initial conditions, not toy problems
 - Python API with NumPy output
 - OpenGL real-time viewer

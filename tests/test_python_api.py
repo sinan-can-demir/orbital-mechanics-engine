@@ -120,3 +120,13 @@ def test_simulate_adaptive_matches_cpp_golden():
     assert len(E) == golden['rk45.n_snapshots']
     assert E[-1] == pytest.approx(golden['rk45.last.E'], rel=1e-9)
     assert result.positions_numpy().shape == (len(E), 3, 3)
+
+
+def test_constants_exposed_and_match_header():
+    import re
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / 'include' / 'constants.h').read_text()
+    g = float(re.search(r'constexpr double G\s*=\s*([0-9.eE+-]+)\s*;', text).group(1))
+    c = float(re.search(r'constexpr double C_LIGHT\s*=\s*([0-9.eE+-]+)\s*;', text).group(1))
+    assert orbit.G == g
+    assert orbit.C_LIGHT == c

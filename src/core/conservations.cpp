@@ -10,7 +10,7 @@
 namespace physics
 {
 
-// RECALL constants::G = 6.67430e-11 (m^3 kg^-1 s^-2)
+// G comes from physics::constants (include/constants.h), in m^3 kg^-1 s^-2
 
 // ---- helper: Euclidean distance (vec3) ---- //
 static inline double distance(const CelestialBody& a, const CelestialBody& b)

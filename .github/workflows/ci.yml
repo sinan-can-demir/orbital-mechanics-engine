@@ -61,6 +61,14 @@ jobs:
             fi
           done <<< "$files"
 
+  drift-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check constants, system files and integrator lists for drift
+        run: python3 tools/check_drift.py
+
   build:
     needs: lint
     runs-on: ubuntu-latest
@@ -129,4 +137,4 @@ jobs:
         run: pip install -e . --no-build-isolation -q
 
       - name: Run Python API tests
-        run: pytest tests/test_python_api.py -v
+        run: pytest tests/test_python_api.py tests/test_spice_constants.py -v

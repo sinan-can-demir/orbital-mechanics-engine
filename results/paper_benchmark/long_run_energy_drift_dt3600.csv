@@ -1,0 +1,6 @@
+integrator,wall_s,max_dE_over_10yr,max_dE_over_100yr,max_dE_over_1000yr
+RK4 (dt=3600s),87.1,4.824e-14,4.824e-14,7.113e-13
+Leapfrog (dt=3600s),17.7,3.739e-10,3.924e-10,3.931e-10
+Yoshida4 (dt=3600s),52.6,7.237e-14,1.255e-13,4.688e-13
+Hermite (dt=3600s),80.2,1.634e-13,2.248e-13,6.141e-13
+RK45 (tol=1e-9),11.0,1.376e-10,1.471e-09,1.590e-08

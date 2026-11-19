@@ -28,15 +28,15 @@ All core phases are complete. The project is in pre-submission preparation.
 | Python API (`orbit` module) | ✅ Done | `simulate()`, `simulate_adaptive()`, NumPy output |
 | pybind11 bindings | ✅ Done | `orbit.Integrator` enum, `SimulationResult`, `positions_numpy()` |
 | scikit-build-core packaging | ✅ Done | `pip install -e .` |
-| Jupyter notebooks | ✅ Done | 8 notebooks in `examples/` |
+| Jupyter notebooks | ✅ Done | 9 notebooks in `examples/` (01-09) |
 | NASA SPICE validation (DE440) | ✅ Done | `python/spice_validate.py`, notebook 07 |
 | Post-Newtonian GR correction | ✅ Done | Schwarzschild 1PN, `applyGRCorrection()`, `--gr` / `gr=True` |
 | Yoshida 4th-order symplectic integrator | ✅ Done | `yoshida4Step()`, notebook 08 |
 | Hermite predictor-corrector integrator | ✅ Done | `hermiteStep()`, `computeJerks()`, `--integrator hermite`, O(dt⁴) verified in `tests/test_hermite.cpp` |
 | REBOUND comparison | ✅ Done | Notebooks 05 & 06, `benchmark_rebound.py` |
 | CI pipeline | ✅ Done | Lint, C++ build, ctest, pytest on every push |
-| C++ test suite | ✅ Done | 9 tests via ctest |
-| Python test suite | ✅ Done | 4 tests via pytest |
+| C++ test suite | ✅ Done | 10 tests via ctest |
+| Python test suite | ✅ Done | 22 tests via pytest (`tests/test_python_api.py`, `tests/test_spice_constants.py`) |
 | README audit | ✅ Done | All commands verified on clean machine |
 | CONTRIBUTING.md | ✅ Done | Setup, style, integrator guide, PR checklist |
 | FUTURE.md | ✅ Done | Yoshida, binary I/O, native app, systems DB, detection features |
@@ -52,7 +52,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Community guidelines (CONTRIBUTING.md) | ✅ Done |
 | Passing test suite (ctest + pytest) | ✅ Done |
 | Python API with NumPy output | ✅ Done |
-| Jupyter notebook examples (6 notebooks) | ✅ Done |
+| Jupyter notebook examples (9 notebooks) | ✅ Done |
 | Clean install verified on separate machine | ✅ Done |
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ✅ Done |
@@ -107,16 +107,16 @@ https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
 
 - [x] Write `python/spice_ic.py` — queries SPICE for body positions/velocities at a given epoch, writes `systems/solar_system_spice.json`
 - [x] Fix snapshot timestamp bug: `runSimulationCore` was labeling snapshots `i*dt` but saving the state at `(i+1)*dt`. Fixed to `(i+1)*dt`.
-- [x] Verify: re-run SPICE validation with SPICE-derived ICs — t=1h error = **0 km** (from 107,000 km with HORIZONS ICs)
+- [x] Verify: re-run SPICE validation with SPICE-derived ICs — t=1h error = **0 km** (Horizons-derived ICs measure 342-3,038 km off DE440 at t=1h; Earth 2,096 km)
 - [x] Document in `docs/paper_notes.md` with corrected numbers
 
-**Result:** With DE440 ICs, Earth 1-year error = **88,126 km (0.059%)**, dominated by missing GR. All 4 integrators give identical error — physics-dominated, not numerical.
+**Result (corrected 2026-11-18):** an earlier version of this entry reported Earth at 88,126 km after one year and blamed missing GR. That error came from masses in `solar_system_spice.json` computed with G = 6.674e-11 instead of the engine's 6.67430e-11. After regenerating the file, Earth's 1-year error is 61 km with GR off and 0.2 km with GR on (RK4). See `docs/validation.md`.
 
 ---
 
 ### Step 1c — Post-Newtonian GR Correction ✅ Done
 
-Add the first post-Newtonian correction to gravitational acceleration. This is the dominant missing physics for inner planets — fixes Mercury's 43"/century perihelion precession and reduces Earth/Venus position errors.
+Add the first post-Newtonian correction to gravitational acceleration. This adds the dominant relativistic effect for inner planets: Mercury's 43"/century perihelion precession and the inner-planet position errors against DE440.
 
 **Why:** DE440 is built with full GR. Our Newtonian engine systematically drifts from it for inner planets. One force term fixes most of this.
 

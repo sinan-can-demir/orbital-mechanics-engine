@@ -2,8 +2,9 @@
 Build a system JSON from NASA SPICE DE440 initial conditions.
 
 Replaces HORIZONS-based build-system for validation workflows.
-Using DE440 ICs with DE440 as ground truth eliminates the ~107,000 km
-IC mismatch at t=0, giving a clean test of integration accuracy only.
+Using DE440 ICs with DE440 as ground truth eliminates the IC mismatch at t=0
+(Horizons-derived ICs are 342-3,038 km off DE440 at t=1 h; see docs/validation.md),
+giving a clean test of integration accuracy only.
 
 Usage:
     python3 python/spice_ic.py --epoch 2025-01-01 --output systems/solar_system_spice.json
@@ -14,9 +15,11 @@ import os
 import json
 import argparse
 
+import orbit  # G comes from the engine (include/constants.h)
+
 _KERNEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'spice'))
 
-G = 6.67430e-11  # m³ kg⁻¹ s⁻²  (CODATA 2018, matches physics::constants::G in utils.h)
+G = orbit.G  # m³ kg⁻¹ s⁻² — physics::constants::G in include/constants.h (single source of truth)
 
 # Body definitions: name, NAIF position ID, SPICE GM body name
 # Position IDs match spice_validate.py for consistency
@@ -85,7 +88,7 @@ def build_system(epoch='2025-01-01T00:00:00', bodies=None, output=None):
             except Exception:
                 # Fall back to known values if SPICE doesn't have the GM
                 fallback = {
-                    'Sun': 1.98847e30, 'Mercury': 3.3011e23, 'Venus': 4.8675e24,
+                    'Sun': orbit.M_SUN, 'Mercury': 3.3011e23, 'Venus': 4.8675e24,
                     'Earth': 5.9722e24, 'Moon': 7.342e22, 'Mars': 6.4171e23,
                     'Jupiter': 1.8982e27, 'Saturn': 5.6834e26,
                     'Uranus': 8.6810e25, 'Neptune': 1.02413e26,
