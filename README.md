@@ -57,7 +57,7 @@ pos = result.positions_numpy()   # shape: (n_steps, n_bodies, 3)  metres
 E   = result.energies_numpy()    # shape: (n_steps,)               Joules
 
 print(result.body_names)         # ['Sun', 'Mercury', 'Venus', ...]
-print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-10
+print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-14 (RK4, dt = 1 h, 1 year)
 ```
 
 ### CLI
