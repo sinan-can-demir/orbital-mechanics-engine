@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include "constants.h"
 #include "simulation.h"
 #include "json_loader.h"
 
@@ -69,6 +70,11 @@ PYBIND11_MODULE(orbit, m)
 {
     m.doc() = "Orbital Mechanics Engine — Python bindings";
     m.attr("__version__") = "2.0.0";
+
+    // Single source of truth for physical constants: Python reads the same
+    // values the C++ engine uses (include/constants.h).
+    m.attr("G") = physics::constants::G;             // m^3 kg^-1 s^-2
+    m.attr("C_LIGHT") = physics::constants::C_LIGHT; // m/s
 
     // Note: there is no Euler integrator; the Integrator enum has no such member.
     py::enum_<Integrator>(m, "Integrator")

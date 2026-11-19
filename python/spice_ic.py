@@ -15,9 +15,11 @@ import os
 import json
 import argparse
 
+import orbit  # G comes from the engine (include/constants.h)
+
 _KERNEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'spice'))
 
-G = 6.67430e-11  # m³ kg⁻¹ s⁻²  (CODATA 2018, matches physics::constants::G in utils.h)
+G = orbit.G  # m³ kg⁻¹ s⁻² — physics::constants::G in include/constants.h (single source of truth)
 
 # Body definitions: name, NAIF position ID, SPICE GM body name
 # Position IDs match spice_validate.py for consistency
