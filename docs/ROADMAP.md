@@ -28,15 +28,15 @@ All core phases are complete. The project is in pre-submission preparation.
 | Python API (`orbit` module) | ✅ Done | `simulate()`, `simulate_adaptive()`, NumPy output |
 | pybind11 bindings | ✅ Done | `orbit.Integrator` enum, `SimulationResult`, `positions_numpy()` |
 | scikit-build-core packaging | ✅ Done | `pip install -e .` |
-| Jupyter notebooks | ✅ Done | 8 notebooks in `examples/` |
+| Jupyter notebooks | ✅ Done | 9 notebooks in `examples/` (01-09) |
 | NASA SPICE validation (DE440) | ✅ Done | `python/spice_validate.py`, notebook 07 |
 | Post-Newtonian GR correction | ✅ Done | Schwarzschild 1PN, `applyGRCorrection()`, `--gr` / `gr=True` |
 | Yoshida 4th-order symplectic integrator | ✅ Done | `yoshida4Step()`, notebook 08 |
 | Hermite predictor-corrector integrator | ✅ Done | `hermiteStep()`, `computeJerks()`, `--integrator hermite`, O(dt⁴) verified in `tests/test_hermite.cpp` |
 | REBOUND comparison | ✅ Done | Notebooks 05 & 06, `benchmark_rebound.py` |
 | CI pipeline | ✅ Done | Lint, C++ build, ctest, pytest on every push |
-| C++ test suite | ✅ Done | 9 tests via ctest |
-| Python test suite | ✅ Done | 4 tests via pytest |
+| C++ test suite | ✅ Done | 10 tests via ctest |
+| Python test suite | ✅ Done | 22 tests via pytest (`tests/test_python_api.py`, `tests/test_spice_constants.py`) |
 | README audit | ✅ Done | All commands verified on clean machine |
 | CONTRIBUTING.md | ✅ Done | Setup, style, integrator guide, PR checklist |
 | FUTURE.md | ✅ Done | Yoshida, binary I/O, native app, systems DB, detection features |
@@ -52,7 +52,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Community guidelines (CONTRIBUTING.md) | ✅ Done |
 | Passing test suite (ctest + pytest) | ✅ Done |
 | Python API with NumPy output | ✅ Done |
-| Jupyter notebook examples (6 notebooks) | ✅ Done |
+| Jupyter notebook examples (9 notebooks) | ✅ Done |
 | Clean install verified on separate machine | ✅ Done |
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ✅ Done |

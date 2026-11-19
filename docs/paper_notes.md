@@ -9,11 +9,11 @@ Pre-writing notes for paper.md (JOSS submission). Not a draft — just findings 
 | Phase | Status | Description |
 |---|---|---|
 | Python API (pybind11) | Done | `orbit.simulate()`, `simulate_adaptive()`, NumPy output |
-| Tests + CI | Done | 7 C++ tests, 4 Python tests, GitHub Actions |
-| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 6 notebooks |
+| Tests + CI | Done | 10 ctest tests, 22 pytest tests (counted 2026-11-18), GitHub Actions |
+| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 9 notebooks |
 | REBOUND comparison | Done | Notebooks 05 & 06, benchmark script |
-| **SPICE validation** | **Next** | Compare simulated vs real trajectories using NASA kernels |
-| paper.md + paper.bib | Pending | JOSS submission — blocked on SPICE results |
+| SPICE validation | Done | Compared against DE440; see below (rerun 2026-11-18) |
+| paper.md + paper.bib | In progress | JOSS submission |
 
 ---
 
@@ -124,13 +124,13 @@ The paper should not position this as "better than REBOUND." The angle is: **tra
 
 ## Statement of Need (draft)
 
-Existing N-body simulators such as REBOUND prioritise maximum accuracy through opaque adaptive integrators. This is appropriate for research but makes them unsuitable for teaching the effects of numerical integration on orbital mechanics. Orbital Mechanics Engine exposes three integration methods — RK4, Leapfrog, and RK45 Dormand-Prince — through a single swappable argument, letting students directly observe and compare energy conservation, timestep behaviour, and long-term drift without modifying any simulation code.
+Existing N-body simulators such as REBOUND prioritise maximum accuracy through opaque adaptive integrators. This is appropriate for research but makes them unsuitable for teaching the effects of numerical integration on orbital mechanics. Orbital Mechanics Engine exposes five integration methods — RK4, Leapfrog, Yoshida4, RK45 Dormand-Prince and Hermite — through a single swappable argument, letting students directly observe and compare energy conservation, timestep behaviour, and long-term drift without modifying any simulation code.
 
 ---
 
 ## Key features for paper
 
-- Three integrators: RK4 (4th order, fixed), Leapfrog (2nd order symplectic, fixed), RK45 Dormand-Prince (adaptive)
+- Five integrators: RK4 (4th order, fixed), Leapfrog (2nd order symplectic, fixed), Yoshida4 (4th order symplectic, fixed), RK45 Dormand-Prince (adaptive), Hermite (4th order predictor-corrector, fixed)
 - NASA JPL HORIZONS integration — real initial conditions, not toy problems
 - Python API with NumPy output
 - OpenGL real-time viewer
