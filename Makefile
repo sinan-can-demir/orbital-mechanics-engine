@@ -203,7 +203,7 @@ python-install:
 
 python-test:
 	@echo -e "$(BLUE)Running Python API tests...$(NC)"
-	pytest tests/test_python_api.py -v
+	pytest tests/test_python_api.py tests/test_spice_constants.py -v
 
 python-check: python-install python-test
 	@echo -e "$(GREEN)Python bindings check complete.$(NC)"
