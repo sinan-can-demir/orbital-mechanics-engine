@@ -483,7 +483,7 @@ static glm::vec3 getBodyPos(const std::string& name)
  * @brief Parses the metadata comment line from a simulation CSV.
  *
  * Expected format:
- *   # stride=1 dt=60 bodies=Sun:1.989e30,Earth:5.972e24,Moon:7.342e22
+ *   # stride=1 dt=60 bodies=Sun:1.98841e30,Earth:5.972e24,Moon:7.342e22
  *
  * All fields are optional — if missing, defaults in CSVMetadata are kept.
  *
@@ -518,7 +518,7 @@ static void parseMetadataComment(const std::string& line, CSVMetadata& meta)
         }
     }
 
-    // ── bodies=Sun:1.989e30,Earth:5.972e24,... ───────────────────────────────
+    // ── bodies=Sun:1.98841e30,Earth:5.972e24,... ───────────────────────────────
     auto bodiesPos = line.find("bodies=");
     if (bodiesPos == std::string::npos)
         return;

@@ -1,5 +1,6 @@
 #include "horizons_builder.h"
 
+#include "constants.h"
 #include "horizons.h"
 #include "horizons_parser.h"
 #include "json_loader.h"
@@ -26,11 +27,16 @@ struct BodyMeta
 };
 
 const std::unordered_map<std::string, BodyMeta> kKnownBodies = {
-    {"10", {"Sun", 1.98847e30}},     {"199", {"Mercury", 3.3011e23}},
-    {"299", {"Venus", 4.8675e24}},   {"399", {"Earth", 5.9722e24}},
-    {"301", {"Moon", 7.342e22}},     {"499", {"Mars", 6.4171e23}},
-    {"599", {"Jupiter", 1.8982e27}}, {"699", {"Saturn", 5.6834e26}},
-    {"799", {"Uranus", 8.6810e25}},  {"899", {"Neptune", 1.02413e26}},
+    {"10", {"Sun", physics::constants::M_SUN}},
+    {"199", {"Mercury", 3.3011e23}},
+    {"299", {"Venus", 4.8675e24}},
+    {"399", {"Earth", 5.9722e24}},
+    {"301", {"Moon", 7.342e22}},
+    {"499", {"Mars", 6.4171e23}},
+    {"599", {"Jupiter", 1.8982e27}},
+    {"699", {"Saturn", 5.6834e26}},
+    {"799", {"Uranus", 8.6810e25}},
+    {"899", {"Neptune", 1.02413e26}},
 };
 
 std::string trim(const std::string& s)

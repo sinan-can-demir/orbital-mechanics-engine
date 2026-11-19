@@ -75,6 +75,9 @@ PYBIND11_MODULE(orbit, m)
     // values the C++ engine uses (include/constants.h).
     m.attr("G") = physics::constants::G;             // m^3 kg^-1 s^-2
     m.attr("C_LIGHT") = physics::constants::C_LIGHT; // m/s
+    m.attr("AU") = physics::constants::AU;           // m (IAU 2012)
+    m.attr("GM_SUN") = physics::constants::GM_SUN;   // m^3 s^-2 (DE440)
+    m.attr("M_SUN") = physics::constants::M_SUN;     // kg, GM_SUN / G
 
     // Note: there is no Euler integrator; the Integrator enum has no such member.
     py::enum_<Integrator>(m, "Integrator")
