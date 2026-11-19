@@ -61,6 +61,14 @@ jobs:
             fi
           done <<< "$files"
 
+  drift-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check constants, system files and integrator lists for drift
+        run: python3 tools/check_drift.py
+
   build:
     needs: lint
     runs-on: ubuntu-latest

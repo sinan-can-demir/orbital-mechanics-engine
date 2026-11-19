@@ -76,6 +76,7 @@ make format-check          # lint
 make BUILD_VIEWER=0 build  # C++ build
 cd build && ctest          # C++ tests
 make python-check          # Python bindings + pytest
+make drift-check           # constants / system files / integrator lists
 ```
 
 Physics contributions must maintain:
