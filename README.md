@@ -191,6 +191,24 @@ docs/             architecture, validation, and roadmap
 
 ---
 
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/SETUP.md](docs/SETUP.md) | First-time install and build guide |
+| [docs/architecture.md](docs/architecture.md) | Codebase design guidelines |
+| [docs/design-notes.md](docs/design-notes.md) | Design decisions and trade-offs |
+| [docs/orbital_mechanics_engine_cli_reference.md](docs/orbital_mechanics_engine_cli_reference.md) | `orbit-sim` command examples |
+| [docs/CHECKLIST.md](docs/CHECKLIST.md) | What the CI workflow runs |
+| [docs/validation.md](docs/validation.md) | Validation results, including SPICE DE440 |
+| [docs/constants.md](docs/constants.md) | Physical constants and where they live |
+
+Python helper scripts in `python/`: `compare_integrators.py` (plot conservation drift for two run CSVs),
+`fetch_and_build.py` (fetch Horizons data, build a system, run, plot), `spice_ic.py` and
+`spice_validate.py` / `spice_validation_table.py` (DE440 initial conditions and validation).
+
+---
+
 ## OpenGL Viewer
 
 The engine includes a real-time 3D orbital viewer built with OpenGL. After running a simulation, launch it with:
