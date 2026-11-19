@@ -51,7 +51,7 @@ where $\mathbf{r}$ and $\mathbf{v}$ are measured relative to the most massive bo
 
 ## Initial Conditions and Validation
 
-The `orbit-sim fetch` and `orbit-sim build-system` commands query the NASA JPL Horizons REST API [@horizons] to retrieve state vectors at a user-specified epoch for any solar system body. The retrieved initial conditions were cross-validated against DE440 ephemeris kernels loaded via the SPICE toolkit [@naif], confirming positional agreement at the sub-kilometre level.
+The `orbit-sim fetch` and `orbit-sim build-system` commands query the NASA JPL Horizons REST API [@horizons] to retrieve state vectors at a user-specified epoch for any solar system body. Horizons state vectors differ from DE440 at the epoch by 342–3,038 km depending on the body (Earth 2,096 km), so for validation we also provide `python/spice_ic.py`, which builds a system file directly from DE440 and masses consistent with the engine's gravitational constant. Starting from those initial conditions and propagating the 10-body Solar System for one Julian year, the heliocentric position of Earth differs from DE440 by 61 km with the Newtonian model and by 0.2 km with the 1PN correction enabled (RK4, $\Delta t = 1$ h); Mercury, Venus and Mars agree to 0.5 km or better with the correction, while the Moon remains 12 km off for reasons we have not identified. Second-order Leapfrog at the same timestep is less accurate for Mercury (4,432 km), consistent with its truncation error.
 
 ## Conservation Monitoring
 

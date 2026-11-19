@@ -108,21 +108,23 @@ A 43"/century difference confirms the implementation is correct.
 
 ---
 
-## Expected SPICE validation improvement
+## Measured SPICE validation improvement
 
-After adding GR correction with SPICE-derived ICs:
+Measured against DE440 over one Julian year (10-body system, DE440 ICs with masses consistent
+with the engine's G; RK4, dt = 1 h). Full tables: `docs/validation.md`.
 
-| Body | Without GR (km/yr) | With GR (km/yr) | Improvement |
-|---|---|---|---|
-| Mercury | ~300,000 | ~100,000 | ~67% |
-| Venus | ~194,000 | ~130,000 | ~33% |
-| Earth | ~58,000 | ~40,000 | ~30% |
-| Mars | ~138,000 | ~120,000 | ~13% |
-| Jupiter+ | unchanged | unchanged | GR negligible |
+| Body | GR off (km) | GR on (km) |
+|---|---|---|
+| Mercury | 88.1 | 0.1 |
+| Venus | 96.4 | 0.0 |
+| Earth | 61.1 | 0.2 |
+| Moon | 50.6 | 12.0 |
+| Mars | 31.1 | 0.2 |
+| Jupiter | 0.6 | 0.1 |
 
-*Estimates — actual numbers will come from running the validation.*
-
-Remaining error after GR is dominated by solar oblateness (J2), missing asteroid belt mass, and higher-order GR terms — all negligible for educational purposes.
+The remaining Moon error (12.0 km) is unexplained. J2, asteroid perturbations and the form of the
+GR term (Sun-centred Schwarzschild, not the full Einstein-Infeld-Hoffmann N-body terms) were not
+varied, so no claim is made about their size.
 
 ---
 

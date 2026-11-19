@@ -2,8 +2,9 @@
 Build a system JSON from NASA SPICE DE440 initial conditions.
 
 Replaces HORIZONS-based build-system for validation workflows.
-Using DE440 ICs with DE440 as ground truth eliminates the ~107,000 km
-IC mismatch at t=0, giving a clean test of integration accuracy only.
+Using DE440 ICs with DE440 as ground truth eliminates the IC mismatch at t=0
+(Horizons-derived ICs are 342-3,038 km off DE440 at t=1 h; see docs/validation.md),
+giving a clean test of integration accuracy only.
 
 Usage:
     python3 python/spice_ic.py --epoch 2025-01-01 --output systems/solar_system_spice.json

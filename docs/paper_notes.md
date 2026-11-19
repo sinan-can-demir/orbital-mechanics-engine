@@ -17,54 +17,54 @@ Pre-writing notes for paper.md (JOSS submission). Not a draft — just findings 
 
 ---
 
-## SPICE validation results (✅ Done — Steps 1 + 1b)
+## SPICE validation results (rerun 2026-11-18 after constants fix)
+
+Full tables and method: `docs/validation.md` ("SPICE DE440 Validation Results"). Raw data:
+`results/spice_validation/error_1yr_current.csv` and `..._baseline_G6.674_masses.csv`;
+regenerate with `python3 python/spice_validation_table.py`.
 
 **Setup:** DE440-derived ICs (`systems/solar_system_spice.json`, built by `python/spice_ic.py`),
-ground truth from SPICE `spkgeo()` in ECLIPJ2000 frame. All four integrators, 10-body solar
-system, 1-year run from 2025-01-01.
+ground truth from SPICE `spkgeo()` in ECLIPJ2000 frame, positions relative to the Sun,
+10-body system, exactly one Julian year from 2025-01-01, dt = 1 h for fixed-step methods.
 
-**Bug found and fixed:** The fixed-step simulation loop saved snapshots labeled `i*dt` but
-containing the state AFTER step `i` (actual time `(i+1)*dt`). Fix: changed to `(i+1)*dt`.
-The adaptive (RK45) loop was already correct. Old notebook numbers were affected by this bug.
+**Correction:** earlier versions of these notes reported Earth at 88,126 km after one year and
+attributed it to "missing GR + J2". That was wrong. The system file's masses had been computed
+with G = 6.674e-11 while the engine uses 6.67430e-11. Regenerating the file removes the error.
 
-### Integrator comparison — Earth position error (SPICE ICs)
+### Earth error at 1 year (km)
 
-| Integrator | t=1h (km) | t=1yr (km) | Drift (km) |
+| Integrator | before: GR off | before: GR on | after: GR off | after: GR on |
+|---|---|---|---|---|
+| RK4 | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+| Leapfrog | 87,969.8 | 87,908.8 | 94.3 | 155.3 |
+| Yoshida4 | 88,125.0 | 88,063.9 | 61.1 | 0.1 |
+| Hermite | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+| RK45 tol=1e-9 | 88,125.1 | 88,064.2 | 61.2 | 0.3 |
+| RK45 tol=1e-12 | 88,125.0 | 88,064.1 | 61.1 | 0.2 |
+
+### Per-body errors at 1 year (RK4, dt = 1 h)
+
+| Body | before: GR off | after: GR off | after: GR on |
 |---|---|---|---|
-| RK4 (dt=1h) | 0 | 88,126 | 88,126 |
-| Leapfrog (dt=1h) | 0 | 87,970 | 87,970 |
-| RK45 (atol=1e-9) | 0 | 88,125 | 88,125 |
-| RK45 (atol=1e-12) | 0 | 88,125 | 88,125 |
-
-**Key finding:** All four integrators give identically ~88,000 km at 1 year. Tightening
-RK45 tolerance 1000× makes zero difference. Error is entirely **physics-dominated**
-(missing GR + J2), not numerical precision.
-
-### Per-body errors at 1 year (RK4, dt=1h, SPICE ICs)
-
-| Body | Error at 1yr (km) | % of orbital radius | Notes |
-|---|---|---|---|
-| Venus | 106,214 | 0.070% | Close orbit, GR strong |
-| Mercury | 95,099 | 0.210% | 43″/century GR precession |
-| Moon | 90,759 | — | Coupled to Earth |
-| Earth | 88,126 | 0.059% | |
-| Mars | 71,585 | 0.047% | Boundary of GR significance |
-| Jupiter | 5,246 | 0.001% | GR negligible at 5.2 AU |
-| Saturn | 1,450 | 0.0002% | |
-| Uranus | 353 | 0.00002% | |
-| Neptune | 149 | 0.000006% | |
-
-Sharp drop from Mars → Jupiter confirms inner-planet errors are GR-dominated.
+| Mercury | 95,027.3 | 88.1 | 0.1 |
+| Venus | 106,324.4 | 96.4 | 0.0 |
+| Earth | 88,125.0 | 61.1 | 0.2 |
+| Moon | 90,850.8 | 50.6 | 12.0 |
+| Mars | 71,683.6 | 31.1 | 0.2 |
+| Jupiter | 5,253.1 | 0.6 | 0.1 |
+| Saturn | 1,452.0 | 0.1 | 0.2 |
+| Uranus | 353.3 | 0.1 | 0.1 |
+| Neptune | 149.3 | 0.1 | 0.1 |
 
 ### Paper claim (defensible)
 
-> "Starting from DE440 initial conditions, our Newtonian simulator maintains Earth's position
-> to within 88,126 km (0.059% of orbital radius) over a one-year integration of the
-> full 10-body solar system. Tightening the adaptive integrator tolerance by 1000× produces
-> no change in this error, confirming the residual is dominated by missing post-Newtonian
-> corrections rather than numerical integration precision."
+> "Starting from DE440 initial conditions, the 10-body simulator with the first post-Newtonian
+> correction reproduces Earth's heliocentric position to 0.2-0.3 km and Mercury, Venus and Mars to 0.5 km
+> or better over one Julian year (RK4, Hermite and RK45 integrators);
+> without the correction Earth is 61 km off. The Moon remains 12 km off, which we have not explained."
 
----
+Leapfrog at dt = 1 h is worse (Mercury 4,432 km); this scales like dt^2 and is numerical.
+Yoshida4 with GR on is 17 km off for Mercury; cause not investigated.
 
 ---
 

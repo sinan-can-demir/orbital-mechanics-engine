@@ -107,16 +107,16 @@ https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
 
 - [x] Write `python/spice_ic.py` — queries SPICE for body positions/velocities at a given epoch, writes `systems/solar_system_spice.json`
 - [x] Fix snapshot timestamp bug: `runSimulationCore` was labeling snapshots `i*dt` but saving the state at `(i+1)*dt`. Fixed to `(i+1)*dt`.
-- [x] Verify: re-run SPICE validation with SPICE-derived ICs — t=1h error = **0 km** (from 107,000 km with HORIZONS ICs)
+- [x] Verify: re-run SPICE validation with SPICE-derived ICs — t=1h error = **0 km** (Horizons-derived ICs measure 342-3,038 km off DE440 at t=1h; Earth 2,096 km)
 - [x] Document in `docs/paper_notes.md` with corrected numbers
 
-**Result:** With DE440 ICs, Earth 1-year error = **88,126 km (0.059%)**, dominated by missing GR. All 4 integrators give identical error — physics-dominated, not numerical.
+**Result (corrected 2026-11-18):** an earlier version of this entry reported Earth at 88,126 km after one year and blamed missing GR. That error came from masses in `solar_system_spice.json` computed with G = 6.674e-11 instead of the engine's 6.67430e-11. After regenerating the file, Earth's 1-year error is 61 km with GR off and 0.2 km with GR on (RK4). See `docs/validation.md`.
 
 ---
 
 ### Step 1c — Post-Newtonian GR Correction ✅ Done
 
-Add the first post-Newtonian correction to gravitational acceleration. This is the dominant missing physics for inner planets — fixes Mercury's 43"/century perihelion precession and reduces Earth/Venus position errors.
+Add the first post-Newtonian correction to gravitational acceleration. This adds the dominant relativistic effect for inner planets: Mercury's 43"/century perihelion precession and the inner-planet position errors against DE440.
 
 **Why:** DE440 is built with full GR. Our Newtonian engine systematically drifts from it for inner planets. One force term fixes most of this.
 
