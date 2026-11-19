@@ -28,7 +28,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Python API (`orbit` module) | ✅ Done | `simulate()`, `simulate_adaptive()`, NumPy output |
 | pybind11 bindings | ✅ Done | `orbit.Integrator` enum, `SimulationResult`, `positions_numpy()` |
 | scikit-build-core packaging | ✅ Done | `pip install -e .` |
-| Jupyter notebooks | ✅ Done | 9 notebooks in `examples/` (01-09) |
+| Jupyter notebooks | ✅ Done | 10 notebooks in `examples/` (01-10) |
 | NASA SPICE validation (DE440) | ✅ Done | `python/spice_validate.py`, notebook 07 |
 | Post-Newtonian GR correction | ✅ Done | Schwarzschild 1PN, `applyGRCorrection()`, `--gr` / `gr=True` |
 | Yoshida 4th-order symplectic integrator | ✅ Done | `yoshida4Step()`, notebook 08 |
@@ -52,7 +52,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | Community guidelines (CONTRIBUTING.md) | ✅ Done |
 | Passing test suite (ctest + pytest) | ✅ Done |
 | Python API with NumPy output | ✅ Done |
-| Jupyter notebook examples (9 notebooks) | ✅ Done |
+| Jupyter notebook examples (10 notebooks) | ✅ Done |
 | Clean install verified on separate machine | ✅ Done |
 | REBOUND comparison study | ✅ Done |
 | **NASA SPICE validation** | ✅ Done |
