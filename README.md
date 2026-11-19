@@ -57,7 +57,7 @@ pos = result.positions_numpy()   # shape: (n_steps, n_bodies, 3)  metres
 E   = result.energies_numpy()    # shape: (n_steps,)               Joules
 
 print(result.body_names)         # ['Sun', 'Mercury', 'Venus', ...]
-print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-10
+print('Energy drift:', (E[-1] - E[0]) / abs(E[0]))  # ~1e-14 (RK4, dt = 1 h, 1 year)
 ```
 
 ### CLI
@@ -171,6 +171,7 @@ done
 | [07_spice_validation.ipynb](examples/07_spice_validation.ipynb) | Validation against DE440 SPICE ephemerides |
 | [08_yoshida4.ipynb](examples/08_yoshida4.ipynb) | Yoshida4 symplectic integrator — long-term energy conservation |
 | [09_mercury_gr_precession.ipynb](examples/09_mercury_gr_precession.ipynb) | Mercury perihelion precession — Schwarzschild 1PN GR correction validation |
+| [10_numerical_precession_sweep.ipynb](examples/10_numerical_precession_sweep.ipynb) | Spurious apsidal precession of each integrator vs dt and eccentricity, and the cost of measuring 1PN to 1% |
 
 ---
 
@@ -205,7 +206,9 @@ docs/             architecture, validation, and roadmap
 
 Python helper scripts in `python/`: `compare_integrators.py` (plot conservation drift for two run CSVs),
 `fetch_and_build.py` (fetch Horizons data, build a system, run, plot), `spice_ic.py` and
-`spice_validate.py` / `spice_validation_table.py` (DE440 initial conditions and validation).
+`spice_validate.py` / `spice_validation_table.py` (DE440 initial conditions and validation),
+`precession.py` / `precession_sweep.py` / `precession_analysis.py` (apsidal-precession estimator and the notebook-10 sweep),
+`long_run_energy_drift.py` (10-1000 year energy drift).
 
 ---
 

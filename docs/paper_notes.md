@@ -10,7 +10,7 @@ Pre-writing notes for paper.md (JOSS submission). Not a draft — just findings 
 |---|---|---|
 | Python API (pybind11) | Done | `orbit.simulate()`, `simulate_adaptive()`, NumPy output |
 | Tests + CI | Done | 10 ctest tests, 22 pytest tests (counted 2026-11-18), GitHub Actions |
-| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 9 notebooks |
+| Documentation | Done | README, CONTRIBUTING, FUTURE.md, 10 notebooks |
 | REBOUND comparison | Done | Notebooks 05 & 06, benchmark script |
 | SPICE validation | Done | Compared against DE440; see below (rerun 2026-11-18) |
 | paper.md + paper.bib | In progress | JOSS submission |
