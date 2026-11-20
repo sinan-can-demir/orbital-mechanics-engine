@@ -148,3 +148,6 @@ vgcore.*
 !README.md
 !CONTRIBUTING.md
 !LICENSE
+# keep bytecode out even under re-included tests/
+tests/**/__pycache__/
+*.pyc
