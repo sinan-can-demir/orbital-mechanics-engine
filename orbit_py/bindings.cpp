@@ -69,7 +69,7 @@ py::array_t<double> energies_numpy(const SimulationResult& result)
 PYBIND11_MODULE(orbit, m)
 {
     m.doc() = "Orbital Mechanics Engine — Python bindings";
-    m.attr("__version__") = "2.0.0";
+    m.attr("__version__") = "2.1.0";
 
     // Single source of truth for physical constants: Python reads the same
     // values the C++ engine uses (include/constants.h).

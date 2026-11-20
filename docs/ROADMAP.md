@@ -61,7 +61,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | **Yoshida 4th-order integrator** | ✅ Done |
 | **Hermite integrator** | ✅ Done |
 | **`paper.md` + `paper.bib`** | ✅ Drafted (#28) — needs final author review |
-| Software version tagged on GitHub | ❌ Pending — `pyproject.toml` says `2.0.0` but no `v2.0.0` git tag exists yet |
+| Software version tagged on GitHub | ✅ `v2.0.0`–`v2.0.2` tagged; `v2.1.0` in preparation |
 | DOI via Zenodo | ❌ Pending (after tag) |
 
 ---
