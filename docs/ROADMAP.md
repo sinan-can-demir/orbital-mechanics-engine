@@ -62,7 +62,7 @@ All core phases are complete. The project is in pre-submission preparation.
 | **Hermite integrator** | ✅ Done |
 | **`paper.md` + `paper.bib`** | ✅ Drafted (#28) — needs final author review |
 | Software version tagged on GitHub | ✅ `v2.0.0`–`v2.0.2` tagged; `v2.1.0` in preparation |
-| DOI via Zenodo | ❌ Pending (after tag) |
+| DOI via Zenodo | ✅ [10.5281/zenodo.21215316](https://doi.org/10.5281/zenodo.21215316) (as in README badge) |
 
 ---
 
@@ -189,8 +189,8 @@ Written after SPICE and Yoshida were done. See `docs/paper_notes.md` for benchma
 
 - [x] Bump version to `2.0.0` in `bindings.cpp` and `pyproject.toml`
 - [ ] Merge all open branches to `main` (`debug` has 1 unmerged commit as of this writing)
-- [ ] Tag `v2.0.0` on GitHub — not yet tagged (latest tag is `v1.2.0`)
-- [ ] Register DOI via Zenodo
+- [x] Tag releases on GitHub — `v2.0.0`–`v2.0.2` and `v2.1.0` tagged
+- [x] Register DOI via Zenodo — `10.5281/zenodo.21215316`
 - [ ] Submit to JOSS
 
 ---
